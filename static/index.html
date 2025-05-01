@@ -52,7 +52,7 @@
 <body>
   <!-- Navigation Bar -->
   <nav class="navbar">
-    <div class="navbar-brand">🎙️ LiveNote</div>
+    <div class="navbar-brand">🎙️ Lab12</div>
     <div class="navbar-links">
       <span id="user-info" class="user-info hidden"></span> <!-- Placeholder for user info -->
       <button id="auth-button" class="nav-button">Login</button> <!-- Placeholder for Login/Logout -->
@@ -739,7 +739,7 @@
           }
 
           const data = await res.json();
-          renderNotes(data.summary);
+          renderNotes(data.outline);
           updateStatus("ready", "Notes generated");
         } catch (err) {
           console.error("Error generating notes:", err);

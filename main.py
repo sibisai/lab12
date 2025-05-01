@@ -39,8 +39,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseUpload
 # PDF Generation (Using FPDF2 for macOS compatibility)
-from fpdf import FPDF
-
+from fpdf import FPDF, HTMLMixin
 
 # ── Logging Configuration ─────────────────────────────────────────────────── 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -276,27 +275,34 @@ async def websocket_stt(ws: WebSocket, token: Annotated[str | None, Query()] = N
             pass 
 
 # ── /summarize (Protected & Rate Limited) ───────────────────────────────────
+
 class SumReq(BaseModel):
-    text: str
-    custom_prompt: Optional[str] = None
+    transcript: str = Field(..., alias="transcript")
+    custom_instructions: Optional[str] = Field(None, alias="custom_instructions")
+
+    class Config:
+        allow_population_by_field_name = True
 
 class SumResp(BaseModel):
     outline: str
-
 @app.post("/summarize", response_model=SumResp)
-@limiter.limit(f"{RATE_LIMIT_SUMMARIZE_MINUTE};{RATE_LIMIT_SUMMARIZE_DAY}") # Apply rate limits
-async def summarize(request: Request, r: SumReq, current_user: Annotated[str, Depends(get_current_user)]):
+@limiter.limit(f"{RATE_LIMIT_SUMMARIZE_MINUTE};{RATE_LIMIT_SUMMARIZE_DAY}")
+async def summarize(
+    request: Request,
+    r: SumReq,
+    current_user: Annotated[str, Depends(get_current_user)],
+):
     logger.info(f"Summarize request received for user: {current_user}")
     now = datetime.datetime.now().strftime("%B %d, %Y at %I:%M %p")
-    # print(now)
-    user_instructions = ""
 
-    if r.custom_prompt:
-        if len(r.custom_prompt) > MAX_CUSTOM_INSTRUCTION_LENGTH:
-            logger.warning(f"User {current_user} provided custom instructions exceeding length limit.")
-            raise HTTPException(status_code=400, detail=f"Custom instructions exceed maximum length of {MAX_CUSTOM_INSTRUCTION_LENGTH} characters.")
-        user_instructions = r.custom_prompt.strip()
-        logger.debug(f"Using custom instructions from user {current_user}: {user_instructions[:100]}...")
+    text = r.transcript
+    instructions = r.custom_instructions or ""
+    if instructions and len(instructions) > MAX_CUSTOM_INSTRUCTION_LENGTH:
+        logger.warning(f"User {current_user} provided custom instructions exceeding length limit.")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Custom instructions exceed maximum length of {MAX_CUSTOM_INSTRUCTION_LENGTH} characters."
+        )
 
     final_prompt = textwrap.dedent(f"""
         You are an expert lecture note-taker.
@@ -312,13 +318,12 @@ async def summarize(request: Request, r: SumReq, current_user: Annotated[str, De
         • "Key Terms" and "Action Items" sections
         • Preserve equations in LaTeX.
 
-        {f"Additionally, follow these specific instructions: {r.custom_prompt.strip()}" if r.custom_prompt else ""}
+        {f"Additionally, follow these specific instructions: {instructions}" if instructions else ""}
 
         Transcript:
-        \"\"\"{r.text}\"\"\"
+        \"\"\"{text}\"\"\"
     """)
 
-    logger.debug(f"Sending prompt to OpenAI for user {current_user} (length: {len(final_prompt)})...")
     try:
         chat = await client.chat.completions.create(
             model="gpt-4o-mini",
@@ -327,12 +332,11 @@ async def summarize(request: Request, r: SumReq, current_user: Annotated[str, De
             max_tokens=700,
         )
         md = chat.choices[0].message.content.strip()
-        logger.info(f"Successfully generated summary for user {current_user} (length: {len(md)}).")
         return SumResp(outline=md)
     except Exception as e:
         logger.error(f"Error calling OpenAI API for user {current_user}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error calling OpenAI API: {e}")
-
+    
 # ── /save-to-drive (Protected) ──────────────────────────────────────────────
 class DriveSaveReq(BaseModel):
     notes_content: str
@@ -391,59 +395,63 @@ async def save_to_drive(r: DriveSaveReq, current_user: Annotated[str, Depends(ge
     except Exception as e:
         logger.error(f"Unexpected error saving to Google Drive for user {current_user}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Unexpected error: {e}")
+  
+# subclass to get write_html()
+class PDF(FPDF, HTMLMixin):
+    pass
 
 # ── /download-pdf (Protected) ───────────────────────────────────────────────
 class PdfReq(BaseModel):
     markdown_content: str
-    filename: str = "notes.pdf" # Default filename
-
-# Helper to strip HTML tags
-def strip_html(html_content: str) -> str:
-    return re.sub('<[^>]*>', '', html_content)
+    filename: str = "notes.pdf"  # Default filename
 
 @app.post("/download-pdf")
 async def download_pdf(r: PdfReq, current_user: Annotated[str, Depends(get_current_user)]):
     logger.info(f"PDF download request received for user: {current_user}")
     try:
-        # Convert Markdown to HTML first (to handle formatting like lists, etc.)
-        html_content = markdown2.markdown(r.markdown_content, extras=["fenced-code-blocks", "tables"])
-        # Strip HTML tags to get plain text for FPDF2
-        plain_text_content = strip_html(html_content)
-        
-        # Generate PDF using FPDF2
-        pdf = FPDF()
+        # 1) Convert Markdown -> HTML
+        html_content = markdown2.markdown(
+            r.markdown_content,
+            extras=["fenced-code-blocks", "tables"]
+        )
+
+        # 2) Build PDF and render HTML
+        pdf = PDF()
+        pdf.set_auto_page_break(auto=True, margin=15)
         pdf.add_page()
-        
-        # Add font that supports UTF-8 (like NotoSansCJK)
-        # Ensure the font file path is correct for your environment
+
+        # 3) Register a font that supports UTF-8 if available
         font_path = "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"
         if os.path.exists(font_path):
-            pdf.add_font("NotoSansCJK", fname=font_path)
+            pdf.add_font("NotoSansCJK", "", font_path, uni=True)
             pdf.set_font("NotoSansCJK", size=12)
             logger.debug("Using NotoSansCJK font for PDF.")
         else:
-            # Fallback to standard font if NotoSansCJK is not found
             pdf.set_font("Helvetica", size=12)
-            logger.warning(f"Font not found at {font_path}. Falling back to Helvetica. Unicode characters may not render correctly.")
-            # FPDF2 needs explicit encoding for standard fonts with unicode
-            plain_text_content = plain_text_content.encode('latin-1', 'replace').decode('latin-1')
+            logger.warning(
+                f"Font not found at {font_path}. Falling back to Helvetica. "
+                "Unicode characters may not render correctly."
+            )
 
-        pdf.multi_cell(0, 10, txt=plain_text_content)
-        
-        # Output PDF to bytes
-        pdf_bytes = pdf.output(dest='S').encode('latin-1') # FPDF outputs latin-1 string
-        
-        # Clean filename
-        safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '_', r.filename)
-        if not safe_filename.lower().endswith('.pdf'):
-            safe_filename += '.pdf'
+        # 4) Write HTML (will preserve <h1>, <ul>/<li>, <strong>, <em>, tables, etc.)
+        pdf.write_html(html_content)
+
+        # 5) Output as bytes
+        raw = pdf.output(dest="S")     # returns a bytearray
+        pdf_bytes = bytes(raw)         # immutable bytes for Response
+
+        # 6) Clean up filename
+        safe_filename = re.sub(r"[^a-zA-Z0-9_.-]", "_", r.filename)
+        if not safe_filename.lower().endswith(".pdf"):
+            safe_filename += ".pdf"
 
         logger.info(f"Successfully generated PDF '{safe_filename}' for user {current_user} using FPDF2.")
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",
-            headers={ "Content-Disposition": f"attachment; filename={quote(safe_filename)}" }
+            headers={"Content-Disposition": f"attachment; filename={quote(safe_filename)}"},
         )
+
     except Exception as e:
         logger.error(f"Error generating PDF for user {current_user} using FPDF2: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error generating PDF: {e}")
