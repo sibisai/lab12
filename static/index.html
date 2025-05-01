@@ -1,0 +1,1022 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="./favicon/favicon.ico">
+  <title>lab12</title> <!-- Updated title -->
+
+  <!-- ––––– PDF helper –––––                                   -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" crossorigin="anonymous"
+    referrerpolicy="no-referrer"></script>
+
+  <!-- ––– Markdown renderer ––– -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" referrerpolicy="no-referrer"></script>
+
+  <!-- ––––– Google Identity Services –––––                     -->
+  <script src="https://accounts.google.com/gsi/client" async defer onload="onGoogleGsiLoad()"></script>
+  <script>
+    /* ---- global constants needed before the libs fire ---- */
+    const GOOGLE_CLIENT_ID = "1024744015168-0nni6g7fg6q425lueq3s5ii98s85slek.apps.googleusercontent.com";
+    const GOOGLE_DRIVE_SCOPES = "https://www.googleapis.com/auth/drive.file";
+    /* stub so loaders can call it before we redefine it later */
+    window.updateGDriveButtonState = () => { };
+    window.handleGoogleTokenResponse = () => { };
+
+    /* runs as soon as Google Identity Services finishes loading */
+    function onGoogleGsiLoad() {
+      window.googleTokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: GOOGLE_DRIVE_SCOPES,
+        callback: handleGoogleTokenResponse   // will exist by the time it’s called
+      });
+      window.gisInited = true;
+      window.updateGDriveButtonState();       // safe because of stub above
+    }
+
+    /* runs as soon as api.js finishes loading */
+    function onGoogleApiLoad() {
+      gapi.load("picker", () => {
+        window.pickerApiLoaded = true;
+        window.updateGDriveButtonState();
+      });
+    }
+  </script>
+
+  <!-- ––––– Google JS API loader (for Picker) –––––            -->
+  <script src="https://apis.google.com/js/api.js?onload=onGoogleApiLoad" async defer></script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+  <!-- Navigation Bar -->
+  <nav class="navbar">
+    <div class="navbar-brand">🎙️ LiveNote</div>
+    <div class="navbar-links">
+      <span id="user-info" class="user-info hidden"></span> <!-- Placeholder for user info -->
+      <button id="auth-button" class="nav-button">Login</button> <!-- Placeholder for Login/Logout -->
+      <a href="#" id="feedback-link" class="nav-link">Feedback</a> <!-- Placeholder for Feedback -->
+    </div>
+  </nav>
+
+  <div class="container">
+    <!-- Status Indicator (Moved below controls for better visibility) -->
+    <div id="status-indicator" class="status-bar">
+      <span class="status-dot" id="status-dot"></span>
+      <span class="status" id="status-text">Ready</span>
+    </div>
+
+    <!-- Authentication Modal -->
+    <div id="login-modal" class="login-page" style="display: none;"> <!-- Initially hidden -->
+      <div class="login-container">
+        <span class="close-button" id="close-login-modal">&times;</span> <!-- Close button -->
+        <h2 id="login-title">Login</h2>
+        <form id="login-form">
+          <div class="input-group">
+            <input id="login-email" type="email" placeholder="Email" required>
+          </div>
+          <div class="input-group">
+            <input id="login-password" type="password" placeholder="Password" required>
+          </div>
+          <div class="input-group" id="confirm-group" style="display: none;">
+            <input id="login-confirm" name="password_cofirm" type="password" placeholder="Re-enter password">
+          </div>
+          <label style="font-size:14px; margin-bottom:15px; display:flex; align-items:center;">
+            <input id="toggle-show-pwd" type="checkbox" style="margin-right:6px;">
+            Show password
+          </label>
+          <p id="login-error" style="color:red;   height:1.2em;"></p>
+          <p id="login-success" style="color:green; height:1.2em;"></p>
+          <button type="submit" class="login-btn" id="login-submit">Log in</button>
+          <p id="login-toggle" class="signup-link">Create an account</p>
+        </form>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button id="btn">🎤 Start Recording</button>
+      <button id="pause-btn" class="hidden">⏸️ Pause</button>
+      <button id="sum" disabled>📝 Generate Notes</button>
+      <button id="dl" class="hidden">⬇️ Download PDF</button>
+      <button id="save-gdrive-btn" class="hidden">💾 Save to Google Drive</button>
+      <button id="clear-all-btn" class="secondary hidden">🗑️ Clear All</button> <!-- Initially hidden -->
+      <button id="toggle-custom-instructions" class="secondary">⚙️ Custom Note Instructions</button>
+    </div>
+
+    <div id="custom-instructions-section" class="hidden">
+      <h4>Custom Note Instructions</h4>
+      <textarea id="custom-instructions"
+        placeholder="Enter simple instructions for the AI note-taker here. Example: Focus on action items and decisions made. OR Provide a very brief summary."></textarea>
+    </div>
+
+    <div class="section">
+      <div class="section-title">
+        <span>🔊 Live Transcript</span>
+      </div>
+      <div id="log" class="content-box"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">
+        <span>📜 Full Transcript</span>
+        <span class="edit-cue">(Click to edit)</span>
+      </div>
+      <div id="full" class="content-box" contenteditable="true"></div>
+    </div>
+
+    <div id="notes-section" class="section hidden">
+      <div class="section-title">
+        <span>📋 Generated Notes</span>
+        <button id="toggle-preview" class="secondary hidden">Raw</button>
+      </div>
+      <div id="notes" class="content-box"></div>
+    </div>
+
+    <!-- Feedback Form Modal (Initially hidden) -->
+    <div id="feedback-modal" class="feedback-modal hidden">
+      <div class="feedback-container">
+        <span class="close-button" id="close-feedback-modal">&times;</span> <!-- Close button -->
+        <h2>Feedback</h2>
+        <form id="feedback-form">
+          <textarea id="feedback-text" placeholder="Enter your feedback here..." required></textarea>
+          <div class="feedback-buttons">
+            <button type="submit" id="submit-feedback">Submit</button>
+            <button type="button" id="cancel-feedback">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div> <!-- End of .container -->
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      const JWT_TOKEN_KEY = "liveNoteJwtToken";
+      let jwtToken = localStorage.getItem(JWT_TOKEN_KEY);
+      const $ = selector => {
+        if (selector.startsWith("#")) selector = selector.slice(1);
+        return document.getElementById(selector);
+      };
+
+      let isLoginMode = true; // Renamed from isLogin to avoid conflict
+      const modal = $("login-modal");
+      const title = $("login-title");
+      const form = $("login-form");
+      const email = $("login-email");
+      const pwd = $("login-password");
+      const confirmInput = $("login-confirm");
+      const confGrp = $("confirm-group");
+      const toggle = $("login-toggle");
+      const showPwd = $("toggle-show-pwd");
+      const submitB = $("login-submit");
+      const errMsg = $("login-error");
+      const okMsg = $("login-success");
+
+      // Navbar elements
+      const authButton = $("auth-button");
+      const userInfoSpan = $("user-info");
+      const feedbackLink = $("feedback-link");
+
+      // Feedback Modal elements
+      const feedbackModal = $("feedback-modal");
+      const feedbackForm = $("feedback-form");
+      const cancelFeedbackBtn = $("cancel-feedback");
+      const feedbackText = $("feedback-text");
+      const submitFeedbackBtn = $("submit-feedback"); // Get submit button
+
+      const wsProtocol = location.protocol === "https:" ? "wss" : "ws";
+      const WS_BASE_URL = `${wsProtocol}://${location.host}/ws/stt`;
+      const LOCAL_STORAGE_KEY = "liveNoteSession";
+      const GOOGLE_API_KEY = "AIzaSyA0ouQQjhgCL6KTCnKzxCqdqMYW4aZjCTo"; // Replace with your actual API key if needed
+      const GOOGLE_APP_ID = GOOGLE_CLIENT_ID.split("-")[0];
+
+      let ws, audioCtx, processor, stream, running = false, paused = false;
+      let notesMD = "";
+      let saveTimeout;
+      let isPreviewMode = true;
+      let googleTokenClient;
+      let googleAccessToken = null;
+      let pickerOpenRequested = false;
+
+      const log = $("log");
+      const full = $("full");
+      const notes = $("notes");
+      const sumBtn = $("sum");
+      const dlBtn = $("dl");
+      const saveGDriveBtn = $("save-gdrive-btn");
+      const clearAllBtn = $("clear-all-btn");
+      const notesSection = $("notes-section");
+      const statusDot = $("status-dot");
+      const statusText = $("status-text");
+      const startBtn = $("btn");
+      const pauseBtn = $("pause-btn");
+      const toggleCustomInstructionsBtn = $("toggle-custom-instructions");
+      const customInstructionsSection = $("custom-instructions-section");
+      const customInstructionsTextarea = $("custom-instructions");
+      const togglePreviewBtn = $("toggle-preview");
+
+      function openModal() {
+        modal.style.display = "flex";
+        errMsg.textContent = okMsg.textContent = "";
+      }
+
+      function closeModal() {
+        modal.style.display = "none";
+      }
+
+      function switchAuthMode() {
+        isLoginMode = !isLoginMode;
+        title.textContent = isLoginMode ? "Login" : "Sign up";
+        submitB.textContent = isLoginMode ? "Log in" : "Sign up";
+        toggle.textContent = isLoginMode ? "Create an account" : "Already registered? Log in";
+        confGrp.style.display = isLoginMode ? "none" : "block";
+        confirmInput.required = !isLoginMode;
+        pwd.placeholder = isLoginMode ? "Password" : "Enter a password";
+        confirmInput.value = "";
+        errMsg.textContent = okMsg.textContent = "";
+      }
+
+      toggle.addEventListener("click", switchAuthMode);
+      showPwd.addEventListener("change", () => {
+        const t = showPwd.checked ? "text" : "password";
+        pwd.type = confirmInput.type = t;
+      });
+
+      form.addEventListener("submit", async e => {
+        e.preventDefault();
+        errMsg.textContent = okMsg.textContent = "";
+        if (!isLoginMode && pwd.value !== confirmInput.value) {
+          errMsg.textContent = "Passwords do not match";
+          return;
+        }
+        const url = isLoginMode ? "/token" : "/register";
+        try {
+          const fd = new FormData();
+          fd.append("username", email.value);
+          fd.append("password", pwd.value);
+          const res = await fetch(url, { method: "POST", body: fd });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.detail || "Auth failed");
+          if (!isLoginMode) {
+            okMsg.textContent = "✅ Sign-up successful! Log in.";
+            setTimeout(() => { switchAuthMode(); okMsg.textContent = ""; }, 2000);
+          } else {
+            jwtToken = data.access_token;
+            localStorage.setItem(JWT_TOKEN_KEY, jwtToken);
+            okMsg.textContent = "Login success—loading…";
+            setTimeout(() => {
+              closeModal();
+              updateAuthUI(); // Update nav bar
+              loadSession(); // Load session after successful login
+            }, 500);
+          }
+        } catch (err) {
+          errMsg.textContent = err.message;
+        }
+      });
+
+      // --- Add Event Listeners for Modal Close Buttons ---
+      const closeLoginBtn = $("close-login-modal");
+      const closeFeedbackBtn = $("close-feedback-modal");
+
+      if (closeLoginBtn) {
+        closeLoginBtn.onclick = closeModal;
+      }
+      if (closeFeedbackBtn) {
+        closeFeedbackBtn.onclick = closeFeedbackModal;
+      }
+
+      // --- JWT Handling & UI Update ---
+      function jwtExpired(token) {
+        try {
+          const [, payload] = token.split(".");
+          const { exp, sub } = JSON.parse(atob(payload));
+          const isExpired = Date.now() / 1000 > exp;
+          return { expired: isExpired, username: sub };
+        } catch (_) {
+          return { expired: true, username: null }; // treat any parsing failure as expired
+        }
+      }
+
+      // --- Function to update Clear All button visibility --- START
+      function updateClearAllButtonVisibility() {
+        const hasLogContent = log.textContent.trim().length > 0;
+        const hasFullContent = full.textContent.trim().length > 0;
+        const hasNotesContent = notes.innerHTML.trim().length > 0;
+        const hasContent = hasLogContent || hasFullContent || hasNotesContent;
+        clearAllBtn.classList.toggle("hidden", !hasContent);
+      }
+      // --- Function to update Clear All button visibility --- END
+
+      function updateAuthUI() {
+        let currentToken = localStorage.getItem(JWT_TOKEN_KEY); // Read fresh token
+        if (currentToken) {
+          const { expired, username } = jwtExpired(currentToken);
+          if (expired) {
+            // Token expired or invalid
+            localStorage.removeItem(JWT_TOKEN_KEY);
+            jwtToken = null; // Update global var
+            userInfoSpan.textContent = ""; // Clear user info
+            userInfoSpan.classList.add("hidden");
+            authButton.textContent = "Login";
+            authButton.onclick = openModal;
+            feedbackLink.classList.add("hidden"); // Hide feedback if not logged in
+          } else {
+            // Token valid
+            jwtToken = currentToken; // Update global var
+            userInfoSpan.textContent = `Logged in as: ${username}`;
+            userInfoSpan.classList.remove("hidden");
+            authButton.textContent = "Logout";
+            authButton.onclick = logout;
+            feedbackLink.classList.remove("hidden"); // Show feedback if logged in
+            closeModal(); // Ensure login modal is closed if token is valid
+          }
+        } else {
+          // No token
+          jwtToken = null; // Update global var
+          userInfoSpan.textContent = ""; // Clear user info
+          userInfoSpan.classList.add("hidden");
+          authButton.textContent = "Login";
+          authButton.onclick = openModal;
+          feedbackLink.classList.add("hidden"); // Hide feedback if not logged in
+        }
+        // Update button states that depend on login status
+        sumBtn.disabled = !(full.textContent.trim() && jwtToken);
+        dlBtn.disabled = !(notesMD && jwtToken);
+        dlBtn.classList.toggle("hidden", dlBtn.disabled);
+        updateGDriveButtonState();
+        // Also update clear button visibility based on content and login status
+        updateClearAllButtonVisibility(); // Now defined
+      }
+
+      function logout() {
+        localStorage.removeItem(JWT_TOKEN_KEY);
+        jwtToken = null;
+        // Optionally clear session data on logout?
+        // clearAllContent(true); // Pass true to skip confirmation?
+        updateAuthUI();
+        updateStatus("ready", "Logged out");
+        // Consider reloading the page or just updating UI
+        // location.reload();
+      }
+
+      // Check token status on initial load
+      updateAuthUI();
+      if (!jwtToken) {
+        openModal(); // Open login if not logged in
+      }
+
+      // --- Feedback Modal --- 
+      function openFeedbackModal() {
+        feedbackModal.classList.remove("hidden");
+      }
+
+      function closeFeedbackModal() {
+        feedbackModal.classList.add("hidden");
+        feedbackText.value = ""; // Clear text on close
+      }
+
+      feedbackLink.onclick = (e) => {
+        e.preventDefault(); // Prevent default link behavior
+        openFeedbackModal();
+      };
+      cancelFeedbackBtn.onclick = closeFeedbackModal;
+
+      feedbackForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const feedback = feedbackText.value.trim();
+        if (!feedback) {
+          alert("Please enter your feedback before submitting.");
+          return;
+        }
+        if (!jwtToken) {
+          alert("Please log in to submit feedback.");
+          openModal();
+          return;
+        }
+
+        submitFeedbackBtn.disabled = true;
+        submitFeedbackBtn.textContent = "Submitting...";
+
+        try {
+          const res = await fetchWithAuth("/feedback", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ feedback_text: feedback })
+          });
+
+          if (!res.ok) {
+            const errorData = await res.json();
+            throw new Error(errorData.detail || `HTTP error ${res.status}`);
+          }
+
+          const result = await res.json();
+          console.log("Feedback submission result:", result);
+          alert("Thank you for your feedback!");
+          closeFeedbackModal();
+        } catch (err) {
+          console.error("Error submitting feedback:", err);
+          alert(`Failed to submit feedback: ${err.message}`);
+        } finally {
+          submitFeedbackBtn.disabled = false;
+          submitFeedbackBtn.textContent = "Submit";
+        }
+      });
+
+      // --- Fetch with Auth --- 
+      async function fetchWithAuth(url, options = {}) {
+        if (!jwtToken) {
+          console.error("No JWT token found. Please log in.");
+          openModal(); // Prompt login
+          throw new Error("Authentication required.");
+        }
+
+        const headers = { ...(options.headers || {}), "Authorization": `Bearer ${jwtToken}` };
+        const response = await fetch(url, { ...options, headers });
+
+        if (response.status === 401) {
+          // Unauthorized, likely expired token
+          console.warn("JWT token expired or invalid. Logging out.");
+          logout();
+          throw new Error("Session expired. Please log in again.");
+        }
+        return response;
+      }
+
+      // --- Status Update --- 
+      function updateStatus(state, message) {
+        console.log(`Updating status: ${state} - ${message}`); // Debug log
+        statusText.textContent = message;
+        // Reset classes first
+        statusDot.className = "status-dot";
+        statusText.className = "status";
+
+        switch (state) {
+          case "ready":
+            // Default state, no extra class needed for dot, text is secondary
+            break;
+          case "connecting":
+            statusDot.classList.add("paused"); // Use warning color for connecting
+            statusText.classList.add("paused");
+            break;
+          case "active":
+          case "recording": // Treat recording as active
+            statusDot.classList.add("active");
+            statusText.classList.add("active");
+            break;
+          case "paused":
+            statusDot.classList.add("paused");
+            statusText.classList.add("paused");
+            break;
+          case "summarizing":
+            statusDot.classList.add("paused"); // Use warning color for summarizing
+            statusText.classList.add("paused");
+            break;
+          case "error":
+            statusDot.classList.add("error");
+            statusText.classList.add("error");
+            break;
+          default:
+            console.warn("Unknown status state:", state);
+        }
+      }
+
+      // --- WebSocket Handling --- 
+      function connectWebSocket() {
+        if (!jwtToken) {
+          console.error("Cannot connect WebSocket without JWT token.");
+          openModal();
+          return;
+        }
+        const wsUrl = `${WS_BASE_URL}?token=${jwtToken}`;
+        ws = new WebSocket(wsUrl);
+        updateStatus("connecting", "Connecting...");
+
+        ws.onopen = () => {
+          console.log("WebSocket connected");
+          running = true;
+          paused = false;
+          updateStatus("active", "Recording...");
+          startBtn.textContent = "🛑 Stop Recording";
+          startBtn.classList.add("recording");
+          pauseBtn.classList.remove("hidden");
+          pauseBtn.textContent = "⏸️ Pause";
+          pauseBtn.classList.remove("paused");
+          startAudioProcessing();
+        };
+
+        let interimNode = null;
+
+        ws.onmessage = event => {
+          const data = JSON.parse(event.data);
+
+          if (data.error) {
+            console.error("WebSocket error:", data.error);
+            updateStatus("error", `Error: ${data.error}`);
+            stopRecording();
+            return;
+          }
+
+          // Final result
+          if (data.text !== undefined) {
+            // Remove any existing interim line
+            if (interimNode) {
+              interimNode.remove();
+              interimNode = null;
+            }
+            // Append the final transcript chunk
+            appendLog(data.text, /* isFinal= */ true);
+            updateFullTranscript(data.text);
+
+            // Interim (partial) result
+          } else if (data.partial !== undefined) {
+            // If we don't yet have an interim node, create one
+            if (!interimNode) {
+              interimNode = document.createElement("div");
+              interimNode.style.color = "grey";
+              log.appendChild(interimNode);
+              log.scrollTop = log.scrollHeight;
+            }
+            // Update its text with the latest partial
+            interimNode.textContent = data.partial;
+          }
+        };
+
+        ws.onerror = error => {
+          console.error("WebSocket error:", error);
+          updateStatus("error", "Connection error");
+          running = false;
+        };
+
+        ws.onclose = (event) => {
+          console.log("WebSocket closed:", event.code, event.reason);
+          running = false;
+          paused = false;
+          updateStatus("ready", event.reason || "Disconnected");
+          startBtn.textContent = "🎤 Start Recording";
+          startBtn.classList.remove("recording");
+          pauseBtn.classList.add("hidden");
+          stopAudioProcessing();
+          // Attempt to reconnect if closed unexpectedly?
+        };
+      }
+
+      // --- Audio Processing --- 
+      async function startAudioProcessing() {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)({
+            sampleRate: 16000
+          });
+          const source = audioCtx.createMediaStreamSource(stream);
+
+          // --- Embed AudioWorklet code --- START
+          const workletCode = `
+            class AudioProcessor extends AudioWorkletProcessor {
+              process(inputs, outputs, parameters) {
+                const input = inputs[0];
+                if (input.length > 0) {
+                  const channelData = input[0]; // Use the first channel
+                  const buffer = new Int16Array(channelData.length);
+                  for (let i = 0; i < channelData.length; i++) {
+                    buffer[i] = Math.max(-1, Math.min(1, channelData[i])) * 32767; // Convert to Int16
+                  }
+                  this.port.postMessage(buffer, [buffer.buffer]); // Send buffer, transferring ownership
+                }
+                return true; // Keep processor alive
+              }
+            }
+            registerProcessor('audio-processor', AudioProcessor);
+          `;
+          const blob = new Blob([workletCode], { type: 'application/javascript' });
+          const workletURL = URL.createObjectURL(blob);
+          // --- Embed AudioWorklet code --- END
+
+          await audioCtx.audioWorklet.addModule(workletURL); // Use Blob URL
+          processor = new AudioWorkletNode(audioCtx, "audio-processor");
+          source.connect(processor).connect(audioCtx.destination);
+
+          processor.port.onmessage = (event) => {
+            if (ws && ws.readyState === WebSocket.OPEN && !paused) {
+              console.debug("sending audio chunk, bytes:", event.data.byteLength);
+              ws.send(event.data); // Send Int16Array audio chunk
+            } else {
+              console.warn("not sending chunk—ws.ready?", ws.readyState, "paused?", paused);
+            }
+          };
+
+          // Optional: Revoke URL when context closes, though browser might handle it
+          // audioCtx.onstatechange = () => {
+          //   if (audioCtx.state === 'closed') {
+          //     URL.revokeObjectURL(workletURL);
+          //   }
+          // };
+
+        } catch (err) {
+          console.error("Error accessing microphone or setting up audio:", err);
+          updateStatus("error", "Mic access failed");
+          stopRecording();
+        }
+      }
+
+      function stopAudioProcessing() {
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+          stream = null;
+        }
+        if (processor) {
+          processor.disconnect();
+          processor = null;
+        }
+        if (audioCtx) {
+          audioCtx.close();
+          audioCtx = null;
+        }
+      }
+
+      // --- UI Updates --- 
+      function appendLog(text, isFinal) {
+        const entry = document.createElement("div");
+        entry.textContent = text;
+        if (isFinal) {
+          entry.style.color = "black";
+        } else {
+          entry.style.color = "grey";
+        }
+        log.appendChild(entry);
+        log.scrollTop = log.scrollHeight;
+        updateClearAllButtonVisibility(); // Update button visibility
+      }
+
+      function updateFullTranscript(text) {
+        full.textContent += text + " ";
+        saveSession();
+        sumBtn.disabled = !(full.textContent.trim() && jwtToken);
+        updateClearAllButtonVisibility(); // Update button visibility
+      }
+
+      function renderNotes(markdown) {
+        notesMD = markdown;
+        notesSection.classList.remove("hidden");
+        togglePreviewBtn.classList.remove("hidden");
+        dlBtn.disabled = !(notesMD && jwtToken);
+        dlBtn.classList.toggle("hidden", dlBtn.disabled);
+        updateGDriveButtonState();
+
+        if (isPreviewMode) {
+          notes.innerHTML = marked.parse(markdown);
+        } else {
+          notes.textContent = markdown;
+        }
+        notes.scrollTop = 0;
+        saveSession();
+        updateClearAllButtonVisibility(); // Update button visibility
+      }
+
+      // --- Actions --- 
+      function startRecording() {
+        if (!jwtToken) { openModal(); return; }
+        if (running) return; // Already running
+        clearAllContent(false); // Clear previous content without confirmation
+        connectWebSocket();
+      }
+
+      function stopRecording() {
+        if (!running) return;
+        if (ws) {
+          ws.close();
+        }
+        stopAudioProcessing();
+        running = false;
+        paused = false;
+        startBtn.textContent = "🎤 Start Recording";
+        startBtn.classList.remove("recording");
+        pauseBtn.classList.add("hidden");
+        updateStatus("ready", "Stopped");
+        saveSession(); // Final save
+      }
+
+      function togglePause() {
+        if (!running) return;
+        paused = !paused;
+        if (paused) {
+          pauseBtn.textContent = "▶️ Resume";
+          pauseBtn.classList.add("paused");
+          updateStatus("paused", "Paused");
+          // if (ws && ws.readyState === WebSocket.OPEN) {
+          //   ws.send(JSON.stringify({ command: "pause" })); // Inform backend if needed
+          // }
+        } else {
+          pauseBtn.textContent = "⏸️ Pause";
+          pauseBtn.classList.remove("paused");
+          updateStatus("active", "Recording...");
+          // if (ws && ws.readyState === WebSocket.OPEN) {
+          //   ws.send(JSON.stringify({ command: "resume" })); // Inform backend if needed
+          // }
+        }
+      }
+
+      async function generateNotes() {
+        if (!full.textContent.trim()) return;
+        if (!jwtToken) { openModal(); return; }
+
+        sumBtn.disabled = true;
+        sumBtn.innerHTML = "📝 Generating Notes <span class=\"loading\"></span>";
+        updateStatus("summarizing", "Generating notes...");
+
+        try {
+          const instructions = customInstructionsTextarea.value.trim();
+          const res = await fetchWithAuth("/summarize", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ transcript: full.textContent, custom_instructions: instructions || null })
+          });
+
+          if (!res.ok) {
+            const errorData = await res.json();
+            throw new Error(errorData.detail || `HTTP error ${res.status}`);
+          }
+
+          const data = await res.json();
+          renderNotes(data.summary);
+          updateStatus("ready", "Notes generated");
+        } catch (err) {
+          console.error("Error generating notes:", err);
+          updateStatus("error", `Notes Error: ${err.message}`);
+          notes.textContent = `Error generating notes: ${err.message}`;
+          notesSection.classList.remove("hidden");
+        } finally {
+          sumBtn.disabled = !(full.textContent.trim() && jwtToken);
+          sumBtn.innerHTML = "📝 Generate Notes";
+        }
+      }
+
+      function exportNotesToPdf() {
+        if (!notesMD) return;
+        if (!jwtToken) { openModal(); return; } // Check auth
+
+        const titleMatch = notesMD.match(/^#\s*(.+)$/m);
+        let baseName = titleMatch ? titleMatch[1].trim() : "lecture-notes";
+        const dateMatch = notesMD.match(/^\*\*Date & Time:\*\*\s*(.+)$/m);
+        if (dateMatch) {
+          const safeDate = dateMatch[1].replace(/, /g, "_").replace(/ at /i, "_").replace(/[:\s]+/g, "-").replace(/[^0-9A-Za-z\-_]/g, "");
+          baseName = `${baseName}_${safeDate}`;
+        }
+        baseName = baseName.replace(/[^0-9A-Za-z\-_]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+        const filename = `${baseName}.pdf`;
+
+        dlBtn.disabled = true;
+        dlBtn.innerHTML = "⬇️ Downloading... <span class=\"loading\"></span>";
+
+        // Use backend for PDF generation
+        fetchWithAuth("/download-pdf", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ markdown_content: notesMD })
+        })
+          .then(res => {
+            if (!res.ok) {
+              return res.json().then(err => { throw new Error(err.detail || `HTTP error ${res.status}`); });
+            }
+            return res.blob();
+          })
+          .then(blob => {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.style.display = "none";
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            a.remove();
+          })
+          .catch(err => {
+            console.error("Error downloading PDF:", err);
+            alert(`Failed to download PDF: ${err.message}`);
+          })
+          .finally(() => {
+            dlBtn.disabled = !(notesMD && jwtToken);
+            dlBtn.innerHTML = "⬇️ Download PDF";
+          });
+      }
+
+      function clearAllContent(confirmNeeded = true) {
+        if (confirmNeeded) {
+          if (!confirm("Are you sure you want to clear all transcripts and notes?")) {
+            return;
+          }
+        }
+        log.innerHTML = "";
+        full.textContent = "";
+        notes.innerHTML = "";
+        notesMD = "";
+        notesSection.classList.add("hidden");
+        sumBtn.disabled = true;
+        dlBtn.disabled = true;
+        dlBtn.classList.add("hidden");
+        saveGDriveBtn.classList.add("hidden");
+        localStorage.removeItem(LOCAL_STORAGE_KEY);
+        updateClearAllButtonVisibility(); // Update button visibility
+        updateStatus("ready", "Content cleared");
+      }
+
+      function toggleCustomInstructions() {
+        customInstructionsSection.classList.toggle("hidden");
+      }
+
+      function toggleNotePreview() {
+        isPreviewMode = !isPreviewMode;
+        togglePreviewBtn.textContent = isPreviewMode ? "Raw" : "Preview";
+        renderNotes(notesMD); // Re-render with the new mode
+      }
+
+      // --- Session Saving/Loading --- 
+      function saveSession() {
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(() => {
+          const sessionData = {
+            logHTML: log.innerHTML,
+            fullText: full.textContent,
+            notesMarkdown: notesMD,
+            customInstructions: customInstructionsTextarea.value
+          };
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(sessionData));
+          console.log("Session saved");
+        }, 500); // Debounce saving
+      }
+
+      function loadSession() {
+        const savedData = localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (savedData) {
+          try {
+            const sessionData = JSON.parse(savedData);
+            log.innerHTML = sessionData.logHTML || "";
+            full.textContent = sessionData.fullText || "";
+            customInstructionsTextarea.value = sessionData.customInstructions || "";
+            if (sessionData.notesMarkdown) {
+              renderNotes(sessionData.notesMarkdown);
+            }
+            console.log("Session loaded");
+            updateStatus("ready", "Session loaded");
+          } catch (e) {
+            console.error("Failed to load session:", e);
+            localStorage.removeItem(LOCAL_STORAGE_KEY); // Clear corrupted data
+          }
+        }
+        // Update UI elements based on loaded content
+        sumBtn.disabled = !(full.textContent.trim() && jwtToken);
+        dlBtn.disabled = !(notesMD && jwtToken);
+        dlBtn.classList.toggle("hidden", dlBtn.disabled);
+        updateGDriveButtonState();
+        updateClearAllButtonVisibility(); // Ensure button visibility is correct on load
+      }
+
+      // --- Google Drive Integration --- 
+      window.updateGDriveButtonState = () => {
+        const enabled = window.gisInited && window.pickerApiLoaded && notesMD && jwtToken;
+        saveGDriveBtn.disabled = !enabled;
+        saveGDriveBtn.classList.toggle("hidden", !enabled);
+      };
+
+      window.handleGoogleTokenResponse = (tokenResponse) => {
+        googleAccessToken = tokenResponse.access_token;
+        console.log("Google Access Token obtained.");
+        if (pickerOpenRequested) {
+          createPicker();
+          pickerOpenRequested = false;
+        }
+      };
+
+      function requestGoogleAccessToken() {
+        if (googleTokenClient) {
+          // Prompt the user to select a Google Account and ask for consent to share their data
+          // when establishing a new session.
+          googleTokenClient.requestAccessToken({ prompt: "consent" });
+        } else {
+          console.error("Google Token Client not initialized.");
+        }
+      }
+
+      function openGooglePicker() {
+        if (!notesMD) return;
+        if (!jwtToken) { openModal(); return; }
+
+        pickerOpenRequested = true;
+        if (googleAccessToken) {
+          createPicker();
+        } else {
+          requestGoogleAccessToken();
+        }
+      }
+
+      function createPicker() {
+        if (!googleAccessToken || !window.pickerApiLoaded) {
+          console.error("Cannot create picker: Missing token or Picker API not loaded.");
+          return;
+        }
+
+        const titleMatch = notesMD.match(/^#\s*(.+)$/m);
+        let baseName = titleMatch ? titleMatch[1].trim() : "lecture-notes";
+        const dateMatch = notesMD.match(/^\*\*Date & Time:\*\*\s*(.+)$/m);
+        if (dateMatch) {
+          const safeDate = dateMatch[1].replace(/, /g, "_").replace(/ at /i, "_").replace(/[:\s]+/g, "-").replace(/[^0-9A-Za-z\-_]/g, "");
+          baseName = `${baseName}_${safeDate}`;
+        }
+        baseName = baseName.replace(/[^0-9A-Za-z\-_]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+        const filename = `${baseName}.md`; // Save as Markdown
+
+        const view = new google.picker.View(google.picker.ViewId.DOCS);
+        view.setMimeTypes("application/vnd.google-apps.folder");
+        view.setSelectFolderEnabled(true);
+
+        const picker = new google.picker.PickerBuilder()
+          .enableFeature(google.picker.Feature.NAV_HIDDEN)
+          .setAppId(GOOGLE_APP_ID)
+          .setOAuthToken(googleAccessToken)
+          .addView(view)
+          // .setDeveloperKey(GOOGLE_API_KEY) // API Key might not be needed for Picker with OAuth
+          .setCallback((data) => pickerCallback(data, filename))
+          .build();
+        picker.setVisible(true);
+      }
+
+      async function pickerCallback(data, filename) {
+        if (data.action === google.picker.Action.PICKED) {
+          const folder = data.docs[0];
+          console.log(`Saving to folder: ${folder.name} (ID: ${folder.id})`);
+          saveGDriveBtn.disabled = true;
+          saveGDriveBtn.innerHTML = "💾 Saving... <span class=\"loading\"></span>";
+
+          try {
+            const boundary = "-------314159265358979323846";
+            const delimiter = `\r\n--${boundary}\r\n`;
+            const close_delim = `\r\n--${boundary}--`;
+
+            const metadata = {
+              name: filename,
+              mimeType: "text/markdown",
+              parents: [folder.id]
+            };
+
+            const multipartRequestBody = `${delimiter}Content-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}${delimiter}Content-Type: text/markdown\r\n\r\n${notesMD}${close_delim}`;
+
+            const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${googleAccessToken}`,
+                "Content-Type": `multipart/related; boundary=${boundary}`
+              },
+              body: multipartRequestBody
+            });
+
+            const result = await res.json();
+            if (!res.ok) {
+              throw new Error(result.error?.message || `Google API Error ${res.status}`);
+            }
+            console.log("File saved to Google Drive:", result);
+            alert("Notes saved successfully to Google Drive!");
+
+          } catch (err) {
+            console.error("Error saving to Google Drive:", err);
+            alert(`Failed to save to Google Drive: ${err.message}`);
+          } finally {
+            saveGDriveBtn.disabled = false;
+            saveGDriveBtn.innerHTML = "💾 Save to Google Drive";
+            updateGDriveButtonState(); // Re-check state
+          }
+        }
+      }
+
+      // --- Event Listeners --- 
+      startBtn.onclick = () => { running ? stopRecording() : startRecording(); };
+      pauseBtn.onclick = togglePause;
+      sumBtn.onclick = generateNotes;
+      dlBtn.onclick = exportNotesToPdf;
+      saveGDriveBtn.onclick = openGooglePicker;
+      clearAllBtn.onclick = () => clearAllContent(true); // Pass true for confirmation
+      toggleCustomInstructionsBtn.onclick = toggleCustomInstructions;
+      togglePreviewBtn.onclick = toggleNotePreview;
+
+      // Save content periodically and on page unload
+      full.addEventListener("input", saveSession);
+      customInstructionsTextarea.addEventListener("input", saveSession);
+      window.addEventListener("beforeunload", () => {
+        clearTimeout(saveTimeout); // Clear any pending save
+        saveSession(); // Save immediately before unload
+        if (running) {
+          // Optional: Warn user if recording is active?
+          // return "Recording is in progress. Are you sure you want to leave?";
+        }
+      });
+
+      // Initial load
+      loadSession();
+
+    }); 
+  </script>
+
+</body>
+
+</html>

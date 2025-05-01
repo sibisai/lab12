@@ -1,0 +1,16 @@
+# ignore local venv
+venv/
+# ignore model/download artifacts
+models/
+*.zip
+# Python cache
+__pycache__/
+*.py[cod]
+# dotenv & IDE files
+.env
+*.env
+*.log
+.idea/
+.vscode/
+# Ignore your local zip plus any other archives
+*.zip

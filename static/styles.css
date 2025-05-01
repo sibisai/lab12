@@ -1,0 +1,612 @@
+:root {
+  --primary: #4a6fa5;
+  --primary-dark: #3a5a8c;
+  --secondary: #6c757d;
+  --success: #28a745;
+  --danger: #dc3545;
+  --warning: #ffc107;
+  --light: #f8f9fa;
+  --dark: #343a40;
+  --border-radius: 6px;
+  --box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  --transition: all 0.3s ease;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  line-height: 1.6;
+  color: var(--dark);
+  background-color: var(--light);
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* ——— hero modal ——— */
+.login-page {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.login-container {
+  width: 320px;
+  padding: 40px 30px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  text-align: center;
+  position: relative;
+  /* Added for close button positioning */
+}
+
+.login-container h2 {
+  margin-bottom: 20px;
+  font-size: 32px;
+  color: var(--primary-dark);
+}
+
+.input-group {
+  margin-bottom: 15px;
+}
+
+.input-group input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.login-btn {
+  width: 100%;
+  padding: 10px;
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  margin-top: 10px;
+}
+
+.login-btn:hover {
+  background-color: var(--primary-dark);
+}
+
+.signup-link {
+  margin-top: 12px;
+  font-size: 14px;
+  color: var(--dark);
+  cursor: pointer;
+}
+
+#confirm-group {
+  display: none;
+}
+
+.container {
+  width: 100%;
+  padding: 20px;
+  background-color: white;
+  border-radius: var(--border-radius);
+  box-shadow: var(--box-shadow);
+}
+
+/* --- Navigation Bar --- */
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  /* Pushes brand left, links right */
+  align-items: center;
+  padding: 10px 20px;
+  background-color: #fff;
+  border-bottom: 1px solid #e0e0e0;
+  margin-bottom: 20px;
+  border-radius: var(--border-radius);
+  box-shadow: var(--box-shadow);
+}
+
+.navbar-brand {
+  /* Renamed from .logo */
+  font-size: 20px;
+  font-weight: bold;
+  color: var(--primary);
+}
+
+.navbar-links {
+  /* Renamed from .navbar-right */
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.navbar-links .user-info {
+  /* Style for user info span */
+  font-size: 14px;
+  color: var(--secondary);
+}
+
+.navbar-links .nav-button,
+/* Style for login/logout button */
+.navbar-links .nav-link {
+  /* Style for feedback link (<a>) */
+  padding: 6px 12px;
+  border: 1px solid transparent;
+  /* Base border */
+  border-radius: var(--border-radius);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  text-decoration: none;
+  /* Remove underline from link */
+  display: inline-flex;
+  /* Align icon/text if needed */
+  align-items: center;
+  gap: 4px;
+}
+
+/* Login/Logout Button Specific Style (Primary) */
+.navbar-links .nav-button {
+  background-color: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.navbar-links .nav-button:hover {
+  background-color: var(--primary-dark);
+  border-color: var(--primary-dark);
+}
+
+/* Feedback Link Specific Style (Secondary Button Look) */
+.navbar-links .nav-link {
+  background-color: white;
+  color: var(--primary);
+  border: 1px solid var(--primary);
+}
+
+.navbar-links .nav-link:hover {
+  background-color: #f1f3f5;
+  /* Light background on hover */
+  color: var(--primary-dark);
+  border-color: var(--primary-dark);
+}
+
+/* Status Indicator Bar (below navbar) */
+.status-bar {
+  padding: 5px 20px;
+  background-color: #f1f3f5;
+  border-radius: var(--border-radius);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+}
+
+.controls {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+button {
+  padding: 10px 16px;
+  border: none;
+  border-radius: var(--border-radius);
+  background-color: var(--primary);
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+button:hover {
+  background-color: var(--primary-dark);
+  transform: translateY(-2px);
+}
+
+button:active {
+  transform: translateY(0);
+}
+
+button:disabled {
+  background-color: var(--secondary);
+  cursor: not-allowed;
+  opacity: 0.7;
+  transform: none;
+}
+
+button.recording {
+  background-color: var(--danger);
+}
+
+button.paused {
+  background-color: var(--warning);
+  color: var(--dark);
+}
+
+button.secondary {
+  background-color: var(--secondary);
+}
+
+button.secondary:hover {
+  background-color: #5a6268;
+}
+
+.section {
+  margin-bottom: 20px;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 18px;
+  color: var(--primary-dark);
+}
+
+.section-title button {
+  padding: 4px 8px;
+  font-size: 12px;
+  margin-left: auto;
+  /* Push toggle button to the right */
+}
+
+.edit-cue {
+  font-size: 12px;
+  color: var(--secondary);
+  font-style: italic;
+}
+
+.content-box {
+  background-color: #f9f9f9;
+  border: 1px solid #e0e0e0;
+  border-radius: var(--border-radius);
+  padding: 15px;
+  height: 20vh;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-size: 15px;
+  line-height: 1.5;
+  transition: var(--transition);
+}
+
+.content-box[contenteditable="true"] {
+  background-color: #fff;
+  border-color: var(--primary-dark);
+}
+
+.content-box:focus,
+textarea:focus,
+input[type="password"]:focus {
+  border-color: var(--primary);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(74, 111, 165, 0.2);
+}
+
+#log {
+  height: 15vh;
+  background-color: #f5f5f5;
+  border-left: 4px solid var(--primary);
+}
+
+#full {
+  height: 20vh;
+  color: #555;
+  border-left: 4px solid var(--secondary);
+}
+
+#notes {
+  height: 25vh;
+  background-color: #f8f8ff;
+  border-left: 4px solid var(--success);
+  white-space: normal;
+  /* Allow wrapping for rendered HTML */
+}
+
+#notes h1,
+#notes h2,
+#notes h3,
+#notes h4 {
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+}
+
+#notes ul,
+#notes ol {
+  margin-left: 2em;
+  margin-bottom: 1em;
+}
+
+#notes p {
+  margin-bottom: 1em;
+}
+
+#notes code {
+  background-color: #eee;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-family: monospace;
+}
+
+#notes pre {
+  background-color: #eee;
+  padding: 10px;
+  border-radius: 3px;
+  overflow-x: auto;
+  margin-bottom: 1em;
+}
+
+#custom-instructions-section {
+  margin-top: 15px;
+  padding: 15px;
+  background-color: #f1f3f5;
+  border-radius: var(--border-radius);
+  border: 1px solid #dee2e6;
+}
+
+#custom-instructions {
+  width: 100%;
+  height: 150px;
+  padding: 10px;
+  border: 1px solid #ced4da;
+  border-radius: var(--border-radius);
+  font-family: inherit;
+  font-size: 14px;
+  resize: vertical;
+}
+
+.status {
+  display: inline-block;
+  font-size: 14px;
+  color: var(--secondary);
+  margin-left: 10px;
+}
+
+.status.active {
+  color: var(--success);
+}
+
+.status.paused {
+  color: var(--warning);
+}
+
+.status.error {
+  color: var(--danger);
+}
+
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #ccc;
+  margin-right: 5px;
+}
+
+.status-dot.active {
+  background-color: var(--success);
+  box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.2);
+  animation: pulse 1.5s infinite;
+}
+
+.status-dot.paused {
+  background-color: var(--warning);
+  box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.2);
+}
+
+.status-dot.error {
+  background-color: var(--danger);
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.4);
+  }
+
+  70% {
+    box-shadow: 0 0 0 6px rgba(40, 167, 69, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(40, 167, 69, 0);
+  }
+}
+
+.hidden {
+  display: none !important;
+  /* Use important to override potential conflicts */
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .container {
+    padding: 15px;
+  }
+
+  .controls {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .content-box {
+    height: 25vh;
+  }
+
+  .navbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .navbar-right {
+    margin-top: 10px;
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+/* Loading indicator */
+.loading {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spin 1s ease-in-out infinite;
+  margin-left: 8px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* --- Feedback Modal (Styled like Login Modal) --- */
+.feedback-modal {
+  /* Overlay - same as .login-page */
+  display: none;
+  /* Hidden by default */
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.feedback-container {
+  /* Content Box - similar to .login-container */
+  width: 400px;
+  /* Slightly wider for textarea */
+  padding: 30px 30px;
+  /* Adjusted padding */
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  text-align: left;
+  /* Align text left for form */
+  position: relative;
+  /* For close button positioning */
+}
+
+.feedback-container h2 {
+  margin-bottom: 20px;
+  font-size: 28px;
+  /* Slightly smaller than login */
+  color: var(--primary-dark);
+  text-align: center;
+  /* Center title */
+}
+
+#feedback-form textarea {
+  width: 100%;
+  height: 120px;
+  /* Increased height */
+  padding: 10px 14px;
+  /* Match input padding */
+  margin-bottom: 15px;
+  /* Spacing */
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  /* Match input border-radius */
+  font-size: 14px;
+  /* Match input font-size */
+  resize: vertical;
+  font-family: inherit;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  /* Add transition */
+}
+
+/* Add focus style matching other inputs */
+#feedback-form textarea:focus {
+  border-color: var(--primary);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(74, 111, 165, 0.2);
+}
+
+.feedback-buttons {
+  /* Container for buttons */
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 15px;
+  /* Increased margin-top */
+}
+
+/* Apply standard button styles & specific overrides */
+#feedback-form button {
+  /* Inherits base button styles */
+  width: auto;
+  /* Override general button width: 100% from responsive */
+  padding: 10px 16px;
+  /* Standard button padding */
+}
+
+  /* Inherits primary button style */
+/*
+#feedback-form button#submit-feedback {
+}
+*/
+
+#feedback-form button#cancel-feedback {
+  /* Apply secondary button style */
+  background-color: var(--secondary);
+  color: white;
+}
+
+#feedback-form button#cancel-feedback:hover {
+  background-color: #5a6268;
+}
+
+
+
+
+/* Close Button for Modals */
+.close-button {
+  color: #aaa;
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  font-size: 28px;
+  font-weight: bold;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.close-button:hover,
+.close-button:focus {
+  color: black;
+  text-decoration: none;
+}
