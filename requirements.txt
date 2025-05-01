@@ -18,8 +18,7 @@ psycopg2-binary>=2.9
 # migrations
 alembic>=1.10
 
-# env & security
-python-dotenv>=1.0
+# security
 passlib[bcrypt]>=1.7
 
 google-api-python-client

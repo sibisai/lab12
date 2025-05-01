@@ -15,7 +15,6 @@
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" referrerpolicy="no-referrer"></script>
 
   <!-- ––––– Google Identity Services –––––                     -->
-  <script src="https://accounts.google.com/gsi/client" async defer onload="onGoogleGsiLoad()"></script>
   <script>
     /* ---- global constants needed before the libs fire ---- */
     const GOOGLE_CLIENT_ID = "1024744015168-0nni6g7fg6q425lueq3s5ii98s85slek.apps.googleusercontent.com";
@@ -23,7 +22,7 @@
     /* stub so loaders can call it before we redefine it later */
     window.updateGDriveButtonState = () => { };
     window.handleGoogleTokenResponse = () => { };
-
+    
     /* runs as soon as Google Identity Services finishes loading */
     function onGoogleGsiLoad() {
       window.googleTokenClient = google.accounts.oauth2.initTokenClient({
@@ -34,7 +33,7 @@
       window.gisInited = true;
       window.updateGDriveButtonState();       // safe because of stub above
     }
-
+    
     /* runs as soon as api.js finishes loading */
     function onGoogleApiLoad() {
       gapi.load("picker", () => {
@@ -42,11 +41,15 @@
         window.updateGDriveButtonState();
       });
     }
-  </script>
+    </script>
 
-  <!-- ––––– Google JS API loader (for Picker) –––––            -->
-  <script src="https://apis.google.com/js/api.js?onload=onGoogleApiLoad" async defer></script>
-  <link rel="stylesheet" href="styles.css">
+    <script src="https://accounts.google.com/gsi/client" 
+    defer
+    onload="onGoogleGsiLoad()"></script>
+
+    <!-- ––––– Google JS API loader (for Picker) –––––            -->
+    <script src="https://apis.google.com/js/api.js?onload=onGoogleApiLoad"  defer></script>
+    <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
@@ -890,6 +893,10 @@
       };
 
       function requestGoogleAccessToken() {
+        if (!window.googleTokenClient) {
+          console.warn("GSI client not ready yet");
+          return;
+        }
         if (googleTokenClient) {
           // Prompt the user to select a Google Account and ask for consent to share their data
           // when establishing a new session.
