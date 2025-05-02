@@ -155,7 +155,10 @@
     <div id="notes-section" class="section hidden">
       <div class="section-title">
         <span>📋 Generated Notes</span>
-        <button id="toggle-preview" class="secondary hidden">Raw</button>
+        <div class="note-actions">
+          <button id="toggle-preview" class="secondary hidden">Raw</button>
+          <button id="copy-notes" class="secondary hidden">Copy</button>
+        </div>
       </div>
       <div id="notes" class="content-box"></div>
     </div>
@@ -244,6 +247,7 @@
       const customInstructionsSection = $("custom-instructions-section");
       const customInstructionsTextarea = $("custom-instructions");
       const togglePreviewBtn = $("toggle-preview");
+      const copyBtn = $("copy-notes");
 
       let currentUser = null;
 
@@ -671,6 +675,8 @@
         // --- UI toggles ---
         notesSection.classList.remove("hidden");
         togglePreviewBtn.classList.remove("hidden");
+        copyBtn.classList.remove("hidden");
+        copyBtn.disabled = !markdown.trim();
         updateGDriveButtonState();
 
         // --- Render ---
@@ -694,7 +700,8 @@
       function startRecording() {
         if (!currentUser) { openModal(); return; }
         if (running) return; // Already running
-        clearAllContent(false); // Clear previous content without confirmation
+        clearAllContent(false);
+        localStorage.removeItem(LOCAL_STORAGE_KEY);
         connectWebSocket();
       }
 
@@ -788,7 +795,8 @@
         notesSection.classList.add("hidden");
         sumBtn.disabled = true;
         saveGDriveBtn.classList.add("hidden");
-        localStorage.removeItem(LOCAL_STORAGE_KEY);
+        copyBtn.classList.add("hidden");
+        copyBtn.disabled = true;
         updateClearAllButtonVisibility(); // Update button visibility
         updateStatus("ready", "Content cleared");
       }
@@ -813,7 +821,7 @@
             notesMarkdown:window.notesMD,
             customInstructions: customInstructionsTextarea.value
           };
-          // localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(sessionData));
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(sessionData));
           console.log("Session saved");
         }, 500); // Debounce saving
       }
@@ -1005,6 +1013,33 @@
           // return "Recording is in progress. Are you sure you want to leave?";
         }
       });
+
+      copyBtn.onclick = () => {
+        if (!window.notesMD) return;              // nothing to copy
+
+        /* —— pick the HTML version to copy —— */
+        let html;
+        if (isPreviewMode) {                       // already rendered
+          html = notes.innerHTML;
+        } else {                                  // render markdown once
+          const dirty = marked.parse(window.notesMD);
+          html = DOMPurify.sanitize(dirty, { USE_PROFILES: { html: true } });
+        }
+
+        /* —— Clipboard API with both flavours —— */
+        navigator.clipboard.write([
+          new ClipboardItem({
+            "text/html": new Blob([html], { type: "text/html" }),
+            "text/plain": new Blob([window.notesMD], { type: "text/plain" })
+          })
+        ]).then(() => {
+          copyBtn.textContent = "✅";            // UX feedback
+          setTimeout(() => copyBtn.textContent = "Copy", 1200);
+        }).catch(err => {
+          console.error("Clipboard write failed:", err);
+          alert("Couldn’t copy – see console");
+        });
+      };
 
       // Initial load
       loadSession();

@@ -255,6 +255,23 @@ button.secondary:hover {
   margin-bottom: 20px;
 }
 
+/* The little button group on the right */
+.note-actions {
+  display: flex;
+  /* lay them side by side */
+  gap: 8px;
+  /* spacing between buttons */
+  margin-left: auto;
+  /* push this group all the way to the right */
+}
+
+/* Shrink these buttons so they’re “small” and auto‑width */
+.note-actions button {
+  width: auto !important;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
 .section-title {
   display: flex;
   align-items: center;
@@ -267,7 +284,7 @@ button.secondary:hover {
 .section-title button {
   padding: 4px 8px;
   font-size: 12px;
-  margin-left: auto;
+  /* margin-left: auto; */
   /* Push toggle button to the right */
 }
 
