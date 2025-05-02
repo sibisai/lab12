@@ -160,7 +160,8 @@
       <div class="section-title">
         <span>📋 Generated Notes</span>
         <div class="note-actions">
-          <button id="toggle-preview" class="secondary hidden">Raw</button>
+          <!-- <button id="toggle-preview" class="secondary hidden">Raw</button> -->
+          <span id="quota-info" class="quota-info hidden"></span>
           <button id="copy-notes" class="secondary hidden">Copy</button>
         </div>
       </div>
@@ -234,7 +235,6 @@
 
       let ws, audioCtx, processor, stream, running = false, paused = false;
       let saveTimeout;
-      let isPreviewMode = true;
       let googleAccessToken = null;
       let pickerOpenRequested = false;
 
@@ -252,10 +252,10 @@
       const toggleCustomInstructionsBtn = $("toggle-custom-instructions");
       const customInstructionsSection = $("custom-instructions-section");
       const customInstructionsTextarea = $("custom-instructions");
-      const togglePreviewBtn = $("toggle-preview");
       const copyBtn = $("copy-notes");
 
       let currentUser = null;
+      let lastQuota = null;
 
       async function bootstrapAuth() {
         const res = await fetch("/me", { credentials: "include" });
@@ -345,10 +345,20 @@
       async function fetchQuota() {
         const res = await fetch("/me/quota", { credentials: "include" });
         if (res.ok) {
-          const { remaining, plan } = await res.json();
-          statusText.textContent = `Ready – ${remaining} / ${plan.quota} calls left`;
+          lastQuota = await res.json();
+          paintQuota();
         }
       }
+      function paintQuota() {
+          const el = $("quota-info");
+          if (currentUser && lastQuota) {
+            el.textContent = `Credits: ${lastQuota.remaining} / ${lastQuota.plan.quota}`;
+            el.classList.remove("hidden");
+          } else {
+            el.classList.add("hidden");
+          }
+        }
+
       bootstrapAuth().then(fetchQuota);
 
       // --- Add Event Listeners for Modal Close Buttons ---
@@ -375,6 +385,7 @@
       function updateAuthUI() {
         window.currentUser = currentUser; 
           if (currentUser) {
+              fetchQuota(); 
               userInfoSpan.textContent = `Logged in as: ${currentUser}`;
               userInfoSpan.classList.remove("hidden");
               authButton.textContent = "Logout";
@@ -497,7 +508,7 @@
 
         switch (state) {
           case "ready":
-            // Default state, no extra class needed for dot, text is secondary
+            statusText.textContent = message;
             break;
           case "connecting":
             statusDot.classList.add("paused"); // Use warning color for connecting
@@ -696,21 +707,13 @@
 
         // --- UI toggles ---
         notesSection.classList.remove("hidden");
-        togglePreviewBtn.classList.remove("hidden");
+        // togglePreviewBtn.classList.remove("hidden");
         copyBtn.classList.remove("hidden");
         copyBtn.disabled = !markdown.trim();
         updateGDriveButtonState();
 
-        // --- Render ---
-        if (isPreviewMode) {
-          const dirty = marked.parse(markdown);                     // Markdown → HTML
-          const clean = DOMPurify.sanitize(dirty, {                 // scrub XSS
-            USE_PROFILES: { html: true }
-          });
-          notes.innerHTML = clean;                                  // safe HTML
-        } else {
-          notes.textContent = markdown;                             // raw MD
-        }
+        const html = DOMPurify.sanitize(marked.parse(markdown), { USE_PROFILES: { html: true } });
+        notes.innerHTML = html;
 
         // --- bookkeeping ---
         notes.scrollTop = 0;
@@ -828,11 +831,11 @@
         customInstructionsSection.classList.toggle("hidden");
       }
 
-      function toggleNotePreview() {
-        isPreviewMode = !isPreviewMode;
-        togglePreviewBtn.textContent = isPreviewMode ? "Raw" : "Preview";
-        renderNotes(window.notesMD); // Re-render with the new mode
-      }
+      // function toggleNotePreview() {
+      //   isPreviewMode = !isPreviewMode;
+      //   togglePreviewBtn.textContent = isPreviewMode ? "Raw" : "Preview";
+      //   renderNotes(window.notesMD); // Re-render with the new mode
+      // }
 
       // --- Session Saving/Loading --- 
       function saveSession() {
@@ -867,7 +870,7 @@
             localStorage.removeItem(LOCAL_STORAGE_KEY); // Clear corrupted data
           }
         }
-        console.log("loadSession - Notes MD Length:", window.notesMD?.length);
+        // console.log("loadSession - Notes MD Length:", window.notesMD?.length);
         // Update UI elements based on loaded content
         sumBtn.disabled = !(full.textContent.trim() && currentUser);
         updateGDriveButtonState();
@@ -1047,7 +1050,7 @@
       saveGDriveBtn.onclick = openGooglePicker;
       clearAllBtn.onclick = () => clearAllContent(true); // Pass true for confirmation
       toggleCustomInstructionsBtn.onclick = toggleCustomInstructions;
-      togglePreviewBtn.onclick = toggleNotePreview;
+      // togglePreviewBtn.onclick = toggleNotePreview;
 
       // Save content periodically and on page unload
       full.addEventListener("input", saveSession);
@@ -1064,14 +1067,7 @@
       copyBtn.onclick = () => {
         if (!window.notesMD) return;              // nothing to copy
 
-        /* —— pick the HTML version to copy —— */
-        let html;
-        if (isPreviewMode) {                       // already rendered
-          html = notes.innerHTML;
-        } else {                                  // render markdown once
-          const dirty = marked.parse(window.notesMD);
-          html = DOMPurify.sanitize(dirty, { USE_PROFILES: { html: true } });
-        }
+        const html = notes.innerHTML;
 
         /* —— Clipboard API with both flavours —— */
         navigator.clipboard.write([

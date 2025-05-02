@@ -272,6 +272,14 @@ button.secondary:hover {
   font-size: 12px;
 }
 
+.quota-info {
+  font-size: 0.85rem;
+  color: #555;
+  margin-right: .75rem;
+  /* leaves a bit of space before the copy button */
+  white-space: nowrap;
+}
+
 .section-title {
   display: flex;
   align-items: center;
