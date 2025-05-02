@@ -13,6 +13,8 @@ from fastapi import FastAPI, WebSocket, WebSocketException, Response, HTTPExcept
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.responses import JSONResponse
+from fastapi import Cookie
 from pydantic import BaseModel, Field
 from typing import Optional, Annotated
 from vosk import Model, KaldiRecognizer
@@ -61,9 +63,6 @@ RATE_LIMIT_SUMMARIZE_DAY = os.getenv("RATE_LIMIT_SUMMARIZE_DAY", "100/day")
 # Password hashing context (using bcrypt)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# OAuth2 scheme for dependency injection
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
 # ── Lifespan: create tables on startup ───────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -99,15 +98,6 @@ def verify_token(token: str, credentials_exception):
         logger.warning(f"JWT Error during token verification: {e}")
         raise credentials_exception
 
-# Dependency to get current user from JWT
-async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    return verify_token(token, credentials_exception)
-
 async def get_token_for_websocket(token: Annotated[str | None, Query()] = None):
     if token is None:
         logger.warning("WebSocket connection attempt without token.")
@@ -117,25 +107,18 @@ async def get_token_for_websocket(token: Annotated[str | None, Query()] = None):
     return username
 
 # ── Rate Limiter Setup ──────────────────────────────────────────────────────
-# Use the JWT subject (username) as the key for rate limiting
 def get_limiter_key(request: Request) -> str:
-    try:
-        auth_header = request.headers.get("Authorization")
-        if auth_header and auth_header.startswith("Bearer "):
-            token = auth_header.split(" ")[1]
-            # Use a non-raising exception for key generation context
-            username = verify_token(token, JWTError("Invalid token for rate limit key")) 
-            return username # Use username from JWT as key
-        else:
-            logger.debug("No valid Bearer token found in headers for rate limit key, falling back to IP.")
-    except JWTError:
-        logger.debug("Invalid JWT token for rate limit key, falling back to IP.")
-    except Exception as e:
-        logger.warning(f"Unexpected error getting rate limit key from token: {e}, falling back to IP.")
-        
-    ip_addr = get_ipaddr(request)
-    logger.debug(f"Using IP address {ip_addr} for rate limit key.")
-    return ip_addr
+    # 1) try the session cookie
+    cookie_token = request.cookies.get("access_token")
+    if cookie_token:
+        try:
+            username = verify_token(cookie_token, JWTError("bad"))  # <- returns the sub
+            return username
+        except JWTError:
+            pass           # fall through to IP on bad cookie
+
+    # 2) fallback = client IP (same as before)
+    return get_ipaddr(request)
 
 limiter = Limiter(key_func=get_limiter_key)
 
@@ -208,30 +191,60 @@ async def register(
     return {"username": user.username, "created_at": user.created_at}
 
 
-@app.post("/token", response_model=Token)
+@app.post("/token")
 async def login_for_access_token(
-    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+    form_data: OAuth2PasswordRequestForm = Depends(),
     db: AsyncSession = Depends(get_db),
 ):
     user = await crud.authenticate_user(db, form_data.username, form_data.password)
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    # update last_login
-    user.last_login = datetime.datetime.utcnow()
-    await db.commit()
+        raise HTTPException(status_code=401, detail="Invalid credentials")
 
     access_token = create_access_token({"sub": user.username})
-    return {"access_token": access_token, "token_type": "bearer"}
+    resp = JSONResponse({"username": user.username})
+    resp.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=True,          # ✓ only over HTTPS
+        samesite="lax",
+        max_age=JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/",
+    )
+    return resp
+
+@app.post("/logout")
+def logout():
+    resp = JSONResponse({"message": "Logged out"})
+    resp.delete_cookie("access_token", path="/")
+    return resp
+
+async def get_current_user_from_cookie(
+    access_token: str | None = Cookie(None),
+):
+    if not access_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+        )
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    # reuse your existing verify_token()
+    return verify_token(access_token, credentials_exception)
+
+@app.get("/me")
+async def get_current_user_route(current_user: str = Depends(get_current_user_from_cookie)):
+    return {"username": current_user}
 
 # ── WebSocket: streaming STT (Protected) ───────────────────────────────────
 @app.websocket("/ws/stt")
-async def websocket_stt(ws: WebSocket, token: Annotated[str | None, Query()] = None):
+async def websocket_stt(ws: WebSocket):
     try:
-        username = await get_token_for_websocket(token)
+        cookie_token = ws.cookies.get("access_token")
+        username = verify_token(cookie_token, WebSocketException(code=1008, reason="Invalid token"))
         await ws.accept()
         logger.info(f"WebSocket connection accepted for user: {username}")
     except WebSocketException as e:
@@ -289,7 +302,7 @@ class SumResp(BaseModel):
 async def summarize(
     request: Request,
     r: SumReq,
-    current_user: Annotated[str, Depends(get_current_user)],
+    current_user: Annotated[str, Depends(get_current_user_from_cookie)],
 ):
     logger.info(f"Summarize request received for user: {current_user}")
     now = datetime.datetime.now().strftime("%B %d, %Y at %I:%M %p")
@@ -353,7 +366,7 @@ def markdown_to_html(md: str) -> str:
   return markdown2.markdown(md, extras=["fenced-code-blocks","tables"])
 
 @app.post("/save-to-drive", response_model=DriveSaveResp)
-async def save_to_drive(r: DriveSaveReq, current_user: Annotated[str, Depends(get_current_user)]):
+async def save_to_drive(r: DriveSaveReq, current_user: Annotated[str, Depends(get_current_user_from_cookie)]):
     logger.info(f"Save to Google Drive request received for user: {current_user}, folder: {r.folder_id}")
     
     try:
@@ -405,7 +418,7 @@ class PdfReq(BaseModel):
     filename: str = "notes.pdf"  # Default filename
 
 @app.post("/download-pdf")
-async def download_pdf(r: PdfReq, current_user: Annotated[str, Depends(get_current_user)]):
+async def download_pdf(r: PdfReq, current_user: Annotated[str, Depends(get_current_user_from_cookie)]):
     logger.info(f"PDF download request received for user: {current_user}")
     try:
         # 1) Convert Markdown -> HTML
@@ -460,7 +473,7 @@ class FeedbackReq(BaseModel):
     feedback_text: str
 
 @app.post("/feedback")
-async def submit_feedback(r: FeedbackReq, current_user: Annotated[str, Depends(get_current_user)]):
+async def submit_feedback(r: FeedbackReq, current_user: Annotated[str, Depends(get_current_user_from_cookie)]):
     logger.info(f"Feedback received from user '{current_user}': {r.feedback_text}")
     # In a real application, you might save this to a database, send an email, etc.
     return {"message": "Feedback received successfully!"}
