@@ -968,66 +968,83 @@
         baseName = baseName.replace(/[^0-9A-Za-z\-_]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
         const filename = `${baseName}.md`; // Save as Markdown
 
-        const view = new google.picker.View(google.picker.ViewId.DOCS);
-        view.setMimeTypes("application/vnd.google-apps.folder");
-        view.setSelectFolderEnabled(true);
+        const folderView = new google.picker.DocsView(google.picker.ViewId.FOLDERS)
+          .setIncludeFolders(true)
+          .setSelectFolderEnabled(true);
 
+        console.log("Building picker with folderView..."); // Log before build
+
+        // Build the picker using the correct view variable:
         const picker = new google.picker.PickerBuilder()
-          .enableFeature(google.picker.Feature.NAV_HIDDEN)
           .setAppId(GOOGLE_APP_ID)
           .setOAuthToken(googleAccessToken)
-          .addView(view)
-          // .setDeveloperKey(GOOGLE_API_KEY) // API Key might not be needed for Picker with OAuth
+          .addView(folderView) // <--- CORRECTED LINE
           .setCallback((data) => pickerCallback(data, filename))
+          // Optional: Add feature to create new folders within the picker
+          .enableFeature(google.picker.Feature.CREATE_NEW_FOLDER)
           .build();
-          console.log("Building and showing picker...");
+
+        console.log("Showing picker..."); // Log before setVisible
         picker.setVisible(true);
+        console.log("picker.setVisible(true) called."); // Log after setVisible
       }
 
-      async function pickerCallback(data, filename) {
+     async function pickerCallback(data, filename) {
         if (data.action === google.picker.Action.PICKED) {
           const folder = data.docs[0];
-          console.log(`Saving to folder: ${folder.name} (ID: ${folder.id})`);
+          const folderId = folder.id;
+          const folderName = folder.name; // Good to have for logging/status
+          console.log(`Folder selected: ${folderName} (ID: ${folderId}). Preparing to call backend.`);
+
+          // Ensure we have everything needed
+          if (!window.notesMD || !folderId || !googleAccessToken || !filename) {
+            console.error("Missing data for backend save:", { hasNotes: !!window.notesMD, folderId, hasToken: !!googleAccessToken, filename });
+            alert("Cannot save to drive: missing required information.");
+            return;
+          }
+
           saveGDriveBtn.disabled = true;
           saveGDriveBtn.innerHTML = "💾 Saving... <span class=\"loading\"></span>";
+          updateStatus("active", `Saving to Drive...`); // Update status
 
           try {
-            const boundary = "-------314159265358979323846";
-            const delimiter = `\r\n--${boundary}\r\n`;
-            const close_delim = `\r\n--${boundary}--`;
-
-            const metadata = {
-              name: filename,
-              mimeType: "text/markdown",
-              parents: [folder.id]
-            };
-
-            const multipartRequestBody = `${delimiter}Content-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}${delimiter}Content-Type: text/markdown\r\n\r\n${window.notesMD}${close_delim}`;
-
-            const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
+            // Call YOUR backend endpoint
+            const res = await fetchWithAuth("/save-to-drive", { // Use fetchWithAuth for your JWT
               method: "POST",
-              headers: {
-                "Authorization": `Bearer ${googleAccessToken}`,
-                "Content-Type": `multipart/related; boundary=${boundary}`
-              },
-              body: multipartRequestBody
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                notes_content: window.notesMD, // Send the markdown
+                filename: filename,         // Send the desired filename (backend might adjust extension)
+                folder_id: folderId,
+                google_access_token: googleAccessToken // Send the Google token
+              })
             });
 
-            const result = await res.json();
+            const result = await res.json(); // Parse response from *your* backend
+
             if (!res.ok) {
-              throw new Error(result.error?.message || `Google API Error ${res.status}`);
+              // Use error detail from your backend response
+              throw new Error(result.detail || `Backend Error ${res.status}`);
             }
-            console.log("File saved to Google Drive:", result);
-            alert("Notes saved successfully to Google Drive!");
+
+            console.log("Backend save successful:", result);
+            // Use the filename returned by the backend if it adjusts it (e.g., adds .gdoc conceptually)
+            const savedFileName = result.file_name || filename;
+            alert(`Notes saved successfully to Google Drive as '${savedFileName}'!`);
+            updateStatus("ready", `Saved as '${savedFileName}'`);
 
           } catch (err) {
-            console.error("Error saving to Google Drive:", err);
+            console.error("Error saving via backend:", err);
             alert(`Failed to save to Google Drive: ${err.message}`);
+            updateStatus("error", `Save failed: ${err.message}`);
           } finally {
-            saveGDriveBtn.disabled = false;
+            saveGDriveBtn.disabled = false; // Re-enable button
             saveGDriveBtn.innerHTML = "💾 Save to Google Drive";
-            updateGDriveButtonState(); // Re-check state
+            // updateGDriveButtonState(); // Re-check state might hide button if notes were cleared, etc.
           }
+        } else if (data.action === google.picker.Action.CANCEL) {
+          console.log("Google Picker cancelled by user.");
+          updateStatus("ready", "Save to Drive cancelled.");
         }
       }
 
