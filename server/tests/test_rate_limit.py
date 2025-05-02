@@ -11,9 +11,9 @@ os.environ["REDIS_URL"] = "redis://localhost:6379"
 os.environ["RATE_LIMIT_SUMMARIZE_MINUTE"] = "5/minute"
 os.environ["RATE_LIMIT_SUMMARIZE_DAY"] = "100/day"
 import db; importlib.reload(db)
-import main; importlib.reload(main)
+import server.main as main; importlib.reload(main)
 
-from main import app
+from server.main import app
 import pytest_asyncio, pytest, asyncio
 from httpx import AsyncClient, ASGITransport
 from fastapi import status

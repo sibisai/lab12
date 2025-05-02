@@ -10,9 +10,9 @@ os.environ["OPENAI_API_KEY"] = "dummy_key_for_testing"
 os.environ["REDIS_URL"] = "redis://localhost:6379"
 # reload both modules so they pick up the new DATABASE_URL
 import db; importlib.reload(db)
-import main; importlib.reload(main)
+import server.main as main; importlib.reload(main)
 
-from main import app
+from server.main import app
 import pytest_asyncio, pytest
 from httpx import AsyncClient, ASGITransport
 from fastapi import status

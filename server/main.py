@@ -18,7 +18,7 @@ from typing import Optional, Annotated
 from vosk import Model, KaldiRecognizer
 from openai import AsyncOpenAI
 import markdown2
-from io import BytesIO, StringIO # Import StringIO for Drive upload
+from io import BytesIO
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from datetime import timedelta
@@ -27,12 +27,11 @@ from slowapi.util import get_remote_address, get_ipaddr
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 import redis.asyncio as redis
-import markdown2
 # Db imports
 from contextlib import asynccontextmanager
-from db import engine, get_db
+from server.db import engine, get_db
 from sqlalchemy.ext.asyncio import AsyncSession
-import crud, models
+from server import crud, models
 # Google API Imports
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
@@ -474,6 +473,4 @@ if __name__ == "__main__":
     import uvicorn
     logger.info("Starting server with uvicorn...")
     uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
-
-
 

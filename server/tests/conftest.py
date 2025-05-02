@@ -2,7 +2,7 @@
 import os
 import pytest_asyncio
 from db import engine
-import models
+import server.models as models
 
 # Ensure environment variables for testing are set early
 os.environ.setdefault("INITIAL_AUTH_SECRET", "testsecret")

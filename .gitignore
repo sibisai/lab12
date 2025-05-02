@@ -3,9 +3,14 @@ venv/
 # ignore model/download artifacts
 models/
 *.zip
-# Python cache
+
+# Python byte‑code caches
 __pycache__/
 *.py[cod]
+*$py.class
+
+# pytest cache
+.pytest_cache/
 # dotenv & IDE files
 .env
 *.env

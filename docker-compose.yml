@@ -1,10 +1,13 @@
 services:
-  lab12:
-    build: .
+  livenote:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    volumes:
+      - ./server:/app
+      - ./models:/app/models
+      - ./static:/app/static
     ports:
       - "8000:8000"
     env_file:
-      - .env # loads OPENAI_API_KEY at runtime
-    environment:
-      - PYTHONUNBUFFERED=1 # unbuffered stdout/stderr
-    restart: unless-stopped
+      - .env

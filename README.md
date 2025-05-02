@@ -2,6 +2,8 @@
 
 Offline streaming transcript + one-click AI lecture notes.
 
+---
+
 ## Features
 
 - Real-time transcription using Vosk (offline).
@@ -16,6 +18,8 @@ Offline streaming transcript + one-click AI lecture notes.
 - **Save generated notes directly to Google Drive** (requires setup).
   - Uses the Google Picker UI to select or create folders.
   - Uploaded as native Google Docs via backend HTML conversion.
+
+---
 
 ## Prerequisites
 
@@ -62,6 +66,8 @@ python -m uvicorn main:app --host 0.0.0.0 --port 8000
 # Then visit http://127.0.0.1:8000/
 ```
 
+---
+
 ## Running with Docker (Recommended)
 
 This method uses Docker and Docker Compose to package the application and its dependencies, including the Vosk model and Redis, into containers for easy setup and consistent execution.
@@ -91,19 +97,46 @@ This method uses Docker and Docker Compose to package the application and its de
     ```
 6.  **Access LiveNote:** Navigate to `http://localhost:8000/` (or the port mapped in your `docker-compose.yml`, assuming it maps container port 8000 to host port 8000).
 
+---
+
 ## Security Features
+
+### User Registration & Login
+
+- **Registration (`POST /register`):**  
+  New users can sign up with a username and password. Passwords are hashed using bcrypt (via Passlib) and stored in PostgreSQL.
+- **Login (`POST /token`):**  
+  Users submit their credentials (OAuth2 “password” grant). On success, the server issues a JWT (signed with `JWT_SECRET_KEY`, HS256) containing the user’s username as the `sub` claim.
+
+> **Note:** Two‑factor authentication isn’t implemented yet—email/2FA flows are planned for a future release.
 
 ### JWT Authentication
 
-- **Mechanism:** API Endpoints (`/summarize`, `/save-to-drive`, `/download-pdf`, `/feedback`) and the WebSocket connection (`/ws/stt`) are protected using JSON Web Tokens (JWT).
-- **Login:** The frontend initially requires a shared secret (defined by `INITIAL_AUTH_SECRET` in the `.env` file) to exchange for a short-lived JWT via the `/token` endpoint. (Note: Consider implementing proper user registration/login with password hashing if scaling beyond single/trusted users).
-- **Usage:** The obtained JWT is stored in the browser's local storage and automatically sent in the `Authorization: Bearer <token>` header for API requests (via `fetchWithAuth`) and as a query parameter (`?token=<token>`) for establishing the WebSocket connection. Token expiry is handled, prompting re-login.
+- **Mechanism:**  
+  All protected endpoints (`/summarize`, `/save-to-drive`, `/download-pdf`, `/feedback`) and the STT WebSocket (`/ws/stt`) require a valid JWT.
+- **Access:**
+  - **HTTP calls:** JWT is sent in the `Authorization: Bearer <token>` header; validated via a FastAPI dependency (`OAuth2PasswordBearer` → `verify_token`).
+  - **WebSocket:** JWT is passed as a `?token=<token>` query parameter; validated by `get_token_for_websocket`.
+- **Expiration:**  
+  Tokens expire after `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` (default 60 min); expired tokens trigger a 401 and require re‑login.
+
+### Password Security
+
+- **Hashing:** Passwords are hashed with bcrypt (via Passlib’s `CryptContext`).
+- **Storage:** User records (username, password_hash, `created_at`, `last_login`) live in PostgreSQL.
 
 ### Rate Limiting
 
-- **Mechanism:** The AI-intensive `/summarize` endpoint is rate-limited using `slowapi` to prevent abuse and manage costs.
-- **Defaults:** Configurable via `.env`, defaults might be 5 requests/minute and 100/day per authenticated user (identified by JWT subject).
-- **Storage:** Uses Redis for persistent rate limiting across restarts if `REDIS_URL` is set in `.env`; otherwise, falls back to in-memory limiting (resets on app restart).
+- **Mechanism:**  
+  The `/summarize` endpoint is rate‑limited with SlowAPI (using the JWT subject as the key).
+- **Configurable Rules:**
+  - Per‑minute limit: `RATE_LIMIT_SUMMARIZE_MINUTE` (default “5/minute”)
+  - Per‑day limit: `RATE_LIMIT_SUMMARIZE_DAY` (default “100/day”)
+- **Storage:**
+  - **Redis‑backed:** If `REDIS_URL` is provided and reachable, limits persist across restarts.
+  - **In‑memory fallback:** If Redis is unavailable, limits reset on server restart.
+
+---
 
 ## Google Drive Integration
 
@@ -142,6 +175,8 @@ This method uses Docker and Docker Compose to package the application and its de
 9.  The backend converts the Markdown notes to HTML and uploads the file to the selected Drive folder as a native Google Doc.
 10. A confirmation message appears upon success.
 
+---
+
 ## .env Example
 
 Create a file named `.env` in the project root:
@@ -171,24 +206,40 @@ DATABASE_URL=postgresql+asyncpg://livenote:lab12admin@localhost:5432/livenote
 
 **Note:** Never commit your `.env` file to version control (add it to `.gitignore`).
 
+---
+
 ## Folder Layout
 
-```text
-.
-├── .env                   # Local secrets (DO NOT COMMIT)
+````text
+LAB12/
+├── .env                     # Local secrets (DO NOT COMMIT)
 ├── .gitignore
-├── Dockerfile             # For building the app container
-├── docker-compose.yml     # For running app + Redis (optional)
-├── index.html             # Frontend HTML/JS/CSS
-├── main.py                # FastAPI backend application
-├── models/                # Vosk model directory
-│   └── vosk-model-en-us-0.22/
-├── requirements.txt       # Python dependencies
-├── styles.css             # CSS for frontend (if separate)
-└── tests/                 # Unit/Integration tests
-    ├── test_auth.py
-    └── test_rate_limit.py
-```
+├── .dockerignore
+├── docker-compose.yml       # Compose entrypoint for app + Redis (optional)
+├── LICENSE.md
+├── README.md
+├── static/                  # Frontend assets
+│   ├── favicon/
+│   ├── index.html
+│   └── styles.css
+├── models/                  # Vosk speech models
+│   ├── vosk-model-en-us-0.22/
+│   └── vosk-model-small-en-us-…
+├── server/                  # All backend code & config
+│   ├── __init__.py
+│   ├── auth.py
+│   ├── crud.py
+│   ├── db.py
+│   ├── main.py
+│   ├── models.py
+│   ├── requirements.txt
+│   ├── Dockerfile
+│   └── tests/               # Unit & integration tests
+│       ├── test_auth.py
+│       └── test_rate_limit.py
+└── README.md                # (this file)
+
+---
 
 ## How It Works
 
@@ -208,9 +259,11 @@ DATABASE_URL=postgresql+asyncpg://livenote:lab12admin@localhost:5432/livenote
   8.  Backend uses Google Drive API to create a new file in the specified folder, uploading the HTML content with the Google Docs MIME type (`application/vnd.google-apps.document`) for automatic conversion.
   9.  Backend responds to frontend with success/failure status.
 
+---
+
 ## Future Enhancements
 
-- **Robust Rate‑Limiting & Scaling**  
+- **Robust Rate‑Limiting & Scaling**
   Integrate Redis‑backed rate‑limiting (and test it thoroughly) to enforce quotas per user and protect the OpenAI endpoint under load.
 
 - **Comprehensive Testing Suite**
@@ -230,16 +283,16 @@ DATABASE_URL=postgresql+asyncpg://livenote:lab12admin@localhost:5432/livenote
   - “Freemium” tier limits vs. paid plans
   - Admin dashboard for managing subscribers and usage
 
-- **Speaker Diarization**  
+- **Speaker Diarization**
   Attempt to identify and tag different speakers in the transcript.
 
-- **Cloud Storage Options**  
+- **Cloud Storage Options**
   Add support for Dropbox, OneDrive, etc., alongside Google Drive.
 
-- **Alternative AI Models**  
+- **Alternative AI Models**
   Allow swapping between GPT‑4o, local LLMs, or other cloud models for summarization.
 
-- **Real‑time Summarization**  
+- **Real‑time Summarization**
   Explore incremental note generation as the transcript streams in.
 
 - **Improved UI/UX**
@@ -247,8 +300,10 @@ DATABASE_URL=postgresql+asyncpg://livenote:lab12admin@localhost:5432/livenote
   - More intuitive controls, responsive design
   - Drag‑and‑drop or multi‑window support
 
-- **Export Formats**  
+- **Export Formats**
   Offer additional download options (plain text, Word `.docx`, etc.).
+
+---
 
 ## Testing & Quality
 
@@ -256,8 +311,11 @@ DATABASE_URL=postgresql+asyncpg://livenote:lab12admin@localhost:5432/livenote
 - **Tests:** Basic tests for authentication and rate limiting are included. Run using `pytest`:
   ```bash
   pytest
-  ```
+````
+
 - **CI/CD:** Consider integrating tools like `flake8` (linting), `mypy` (type checking), and `pytest` into a Continuous Integration pipeline (e.g., GitHub Actions) to ensure code quality on each push.
+
+---
 
 ## Acknowledgements
 
