@@ -125,7 +125,7 @@
       <button id="btn">🎤 Start Recording</button>
       <button id="pause-btn" class="hidden">⏸️ Pause</button>
       <button id="sum" disabled>📝 Generate Notes</button>
-      <button id="dl" class="hidden">⬇️ Download PDF</button>
+      <!-- <button id="dl" class="hidden">⬇️ Download PDF</button> -->
       <button id="save-gdrive-btn" class="hidden">💾 Save to Google Drive</button>
       <button id="clear-all-btn" class="secondary hidden">🗑️ Clear All</button> <!-- Initially hidden -->
       <button id="toggle-custom-instructions" class="secondary">⚙️ Custom Note Instructions</button>
@@ -233,7 +233,6 @@
       const full = $("full");
       const notes = $("notes");
       const sumBtn = $("sum");
-      const dlBtn = $("dl");
       const saveGDriveBtn = $("save-gdrive-btn");
       const clearAllBtn = $("clear-all-btn");
       const notesSection = $("notes-section");
@@ -365,8 +364,6 @@
             }
 
           sumBtn.disabled = !(full.textContent.trim() && currentUser);
-          dlBtn.disabled  = !(window.notesMD && currentUser);
-          dlBtn.classList.toggle("hidden", dlBtn.disabled);
           updateGDriveButtonState();
           updateClearAllButtonVisibility();
         }
@@ -674,8 +671,6 @@
         // --- UI toggles ---
         notesSection.classList.remove("hidden");
         togglePreviewBtn.classList.remove("hidden");
-        dlBtn.disabled = !(window.notesMD && currentUser);
-        dlBtn.classList.toggle("hidden", dlBtn.disabled);
         updateGDriveButtonState();
 
         // --- Render ---
@@ -780,57 +775,6 @@
         }
       }
 
-      function exportNotesToPdf() {
-        if (!window.notesMD) return;
-        if (!currentUser) { openModal(); return; } // Check auth
-
-        const titleMatch = window.notesMD.match(/^#\s*(.+)$/m);
-        let baseName = titleMatch ? titleMatch[1].trim() : "lecture-notes";
-        const dateMatch = window.notesMD.match(/^\*\*Date & Time:\*\*\s*(.+)$/m);
-        if (dateMatch) {
-          const safeDate = dateMatch[1].replace(/, /g, "_").replace(/ at /i, "_").replace(/[:\s]+/g, "-").replace(/[^0-9A-Za-z\-_]/g, "");
-          baseName = `${baseName}_${safeDate}`;
-        }
-        baseName = baseName.replace(/[^0-9A-Za-z\-_]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
-        const filename = `${baseName}.pdf`;
-
-        dlBtn.disabled = true;
-        dlBtn.innerHTML = "⬇️ Downloading... <span class=\"loading\"></span>";
-
-        // Use backend for PDF generation
-        fetchWithAuth("/download-pdf", {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ markdown_content: window.notesMD })
-        })
-          .then(res => {
-            if (!res.ok) {
-              return res.json().then(err => { throw new Error(err.detail || `HTTP error ${res.status}`); });
-            }
-            return res.blob();
-          })
-          .then(blob => {
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.style.display = "none";
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            a.remove();
-          })
-          .catch(err => {
-            console.error("Error downloading PDF:", err);
-            alert(`Failed to download PDF: ${err.message}`);
-          })
-          .finally(() => {
-            dlBtn.disabled = !(window.notesMD && currentUser);
-            dlBtn.innerHTML = "⬇️ Download PDF";
-          });
-      }
-
       function clearAllContent(confirmNeeded = true) {
         if (confirmNeeded) {
           if (!confirm("Are you sure you want to clear all transcripts and notes?")) {
@@ -843,8 +787,6 @@
         window.notesMD = "";
         notesSection.classList.add("hidden");
         sumBtn.disabled = true;
-        dlBtn.disabled = true;
-        dlBtn.classList.add("hidden");
         saveGDriveBtn.classList.add("hidden");
         localStorage.removeItem(LOCAL_STORAGE_KEY);
         updateClearAllButtonVisibility(); // Update button visibility
@@ -897,8 +839,6 @@
         console.log("loadSession - Notes MD Length:", window.notesMD?.length);
         // Update UI elements based on loaded content
         sumBtn.disabled = !(full.textContent.trim() && currentUser);
-        dlBtn.disabled = !(window.notesMD && currentUser);
-        dlBtn.classList.toggle("hidden", dlBtn.disabled);
         updateGDriveButtonState();
         updateClearAllButtonVisibility(); // Ensure button visibility is correct on load
       }
@@ -1049,7 +989,6 @@
       startBtn.onclick = () => { running ? stopRecording() : startRecording(); };
       pauseBtn.onclick = togglePause;
       sumBtn.onclick = generateNotes;
-      dlBtn.onclick = exportNotesToPdf;
       saveGDriveBtn.onclick = openGooglePicker;
       clearAllBtn.onclick = () => clearAllContent(true); // Pass true for confirmation
       toggleCustomInstructionsBtn.onclick = toggleCustomInstructions;

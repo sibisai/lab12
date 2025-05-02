@@ -10,7 +10,6 @@ Offline streaming transcript + one-click AI lecture notes.
 - AI-powered note generation using OpenAI API (GPT-4o recommended).
 - Editable full transcript.
 - Markdown preview for generated notes (powered by Marked.js).
-- Download notes as PDF (generated on the backend via `/download-pdf` endpoint using FPDF2).
 - Session persistence (transcript, notes, custom instructions saved in local storage).
 - Custom instructions for AI note generation.
 - JWT-based authentication for API endpoints and WebSocket.
@@ -113,7 +112,7 @@ This method uses Docker and Docker Compose to package the application and its de
 ### JWT Authentication
 
 - **Mechanism:**  
-  All protected endpoints (`/summarize`, `/save-to-drive`, `/download-pdf`, `/feedback`) and the STT WebSocket (`/ws/stt`) require a valid JWT.
+  All protected endpoints (`/summarize`, `/save-to-drive`, `/feedback`) and the STT WebSocket (`/ws/stt`) require a valid JWT.
 - **Access:**
   - **HTTP calls:** JWT is sent in the `Authorization: Bearer <token>` header; validated via a FastAPI dependency (`OAuth2PasswordBearer` → `verify_token`).
   - **WebSocket:** JWT is passed as a `?token=<token>` query parameter; validated by `get_token_for_websocket`.
@@ -247,7 +246,6 @@ LAB12/
 - **Transcription:** Browser captures microphone audio → Sends audio chunks via WebSocket (`/ws/stt?token=<JWT>`) → Backend receives audio → Vosk performs Speech-to-Text → Backend sends partial/final transcript text back via WebSocket → Frontend displays transcript.
 - **Note Generation:** User clicks "Generate Notes" → Frontend sends full transcript via POST to `/summarize` (with JWT) → Backend sends text (+ custom instructions) to OpenAI API (GPT-4o) → OpenAI returns Markdown notes → Backend sends Markdown to frontend.
 - **Markdown Preview:** Frontend uses Marked.js library to render received Markdown as HTML in the notes preview pane.
-- **PDF Download:** User clicks "Download PDF" → Frontend sends Markdown notes via POST to `/download-pdf` (with JWT) → Backend uses FPDF2 library to convert Markdown to HTML, then render HTML to PDF → Backend sends PDF file back as a download response → Browser prompts user to save the PDF.
 - **Google Drive Save:**
   1.  User clicks "Save to Google Drive".
   2.  Frontend uses Google Identity Services to request an OAuth 2.0 access token from Google for the `drive.file` scope (user selects account, grants consent via pop-up).
@@ -326,7 +324,6 @@ This project utilizes several fantastic open-source libraries and services. Many
 - **Google:** For the Google Drive API, Google Picker API, and Google Identity Services used for cloud storage and authentication. (Google Cloud)
 - **FastAPI:** For the high-performance web framework. (FastAPI)
 - **Uvicorn:** For the ASGI server. (Uvicorn)
-- **FPDF2 (pyfpdf):** For server-side PDF generation. (PyFPDF/fpdf2)
 - **Marked.js:** For client-side Markdown rendering. (Marked.js)
 - **SlowAPI:** For rate limiting API endpoints. (SlowAPI)
 - **SQLAlchemy, asyncpg, psycopg2-binary:** For database interaction.

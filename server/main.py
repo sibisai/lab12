@@ -2,7 +2,7 @@
 """
 Lab12
 --------
-FastAPI + WebSocket (Vosk) ➜ OpenAI summary ➜ PDF export (FPDF2) ➜ Google Drive Save
+FastAPI + WebSocket (Vosk) ➜ OpenAI summary ➜ Google Drive Save
 Audio: 16 kHz mono 16-bit PCM
 """
 
@@ -41,7 +41,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseUpload
 # PDF Generation (Using FPDF2 for macOS compatibility)
-from fpdf import FPDF, HTMLMixin
+# from fpdf import FPDF, HTMLMixin
 
 # ── Logging Configuration ─────────────────────────────────────────────────── 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -406,7 +406,6 @@ async def summarize(
                 tokens_used=chat.usage.total_tokens if chat.usage else 0
             )
 
-        # inside summarize()
         def fix_flat_lists(md: str) -> str:
             """Turn ‘Key Terms – a – b – c’ into proper bullets."""
             def _repl(m):
@@ -431,13 +430,6 @@ STYLE_RE = re.compile(r"<style.*?</style>", flags=re.S)
 def md_to_html(md: str) -> str:
     """Loose HTML for Drive – keeps everything."""
     return markdown2.markdown(md, extras=["fenced-code-blocks", "tables"])
-
-def md_to_pdf_html(md: str) -> str:
-    """Tight HTML for FPDF – no <style>, no code blocks."""
-    raw = markdown2.markdown(md, extras=["fenced-code-blocks", "tables"])
-    raw = STYLE_RE.sub("", raw)                   # ① nuke <style> blocks
-    safe = bleach.clean(raw, tags=ALLOWED_TAGS, strip=True)
-    return safe
 
 # ── /save-to-drive (Protected) ──────────────────────────────────────────────
 class DriveSaveReq(BaseModel):
@@ -497,61 +489,6 @@ async def save_to_drive(r: DriveSaveReq, current_user: Annotated[str, Depends(ge
     except Exception as e:
         logger.error(f"Unexpected error saving to Google Drive for user {current_user}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Unexpected error: {e}")
-  
-# subclass to get write_html()
-class PDF(FPDF, HTMLMixin):
-    pass
-
-# ── /download-pdf (Protected) ───────────────────────────────────────────────
-class PdfReq(BaseModel):
-    markdown_content: str
-    filename: str = "notes.pdf"  # Default filename
-
-@app.post("/download-pdf")
-async def download_pdf(r: PdfReq, current_user: Annotated[str, Depends(get_current_user_from_cookie)]):
-    logger.info(f"PDF download request received for user: {current_user}")
-    try:
-        pdf = PDF()
-        pdf.set_auto_page_break(auto=True, margin=15)
-        pdf.add_page()
-
-        safe_html = md_to_pdf_html(r.markdown_content)
-
-        # 3) Register a font that supports UTF-8 if available
-        font_path = "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"
-        if os.path.exists(font_path):
-            pdf.add_font("NotoSansCJK", "", font_path, uni=True)
-            pdf.set_font("NotoSansCJK", size=12)
-            logger.debug("Using NotoSansCJK font for PDF.")
-        else:
-            pdf.set_font("Helvetica", size=12)
-            logger.warning(
-                f"Font not found at {font_path}. Falling back to Helvetica. "
-                "Unicode characters may not render correctly."
-            )
-
-        # 4) Write HTML (will preserve <h1>, <ul>/<li>, <strong>, <em>, tables, etc.)
-        pdf.write_html(safe_html)
-
-        # 5) Output as bytes
-        raw = pdf.output(dest="S")     # returns a bytearray
-        pdf_bytes = bytes(raw)         # immutable bytes for Response
-
-        # 6) Clean up filename
-        safe_filename = re.sub(r"[^a-zA-Z0-9_.-]", "_", r.filename)
-        if not safe_filename.lower().endswith(".pdf"):
-            safe_filename += ".pdf"
-
-        logger.info(f"Successfully generated PDF '{safe_filename}' for user {current_user} using FPDF2.")
-        return Response(
-            content=pdf_bytes,
-            media_type="application/pdf",
-            headers={"Content-Disposition": f"attachment; filename={quote(safe_filename)}"},
-        )
-
-    except Exception as e:
-        logger.error(f"Error generating PDF for user {current_user} using FPDF2: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error generating PDF: {e}")
 
 # ── /feedback (Protected) ─────────────────────────────────────────────────── ADDED
 class FeedbackReq(BaseModel):

@@ -8,7 +8,7 @@ python-dotenv
 markdown2
 slowapi
 redis
-fpdf2
+# fpdf2
 bleach
 
 # database + migrations
