@@ -15,33 +15,49 @@
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" referrerpolicy="no-referrer"></script>
 
   <!-- ––––– Google Identity Services –––––                     -->
-  <script>
-    /* ---- global constants needed before the libs fire ---- */
-    const GOOGLE_CLIENT_ID = "1024744015168-0nni6g7fg6q425lueq3s5ii98s85slek.apps.googleusercontent.com";
-    const GOOGLE_DRIVE_SCOPES = "https://www.googleapis.com/auth/drive.file";
-    /* stub so loaders can call it before we redefine it later */
-    window.updateGDriveButtonState = () => { };
-    window.handleGoogleTokenResponse = () => { };
-    
-    /* runs as soon as Google Identity Services finishes loading */
-    function onGoogleGsiLoad() {
-      window.googleTokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: GOOGLE_CLIENT_ID,
-        scope: GOOGLE_DRIVE_SCOPES,
-        callback: handleGoogleTokenResponse   // will exist by the time it’s called
-      });
-      window.gisInited = true;
-      window.updateGDriveButtonState();       // safe because of stub above
-    }
-    
-    /* runs as soon as api.js finishes loading */
-    function onGoogleApiLoad() {
-      gapi.load("picker", () => {
-        window.pickerApiLoaded = true;
+    <script>
+      const GOOGLE_CLIENT_ID = "1024744015168-0nni6g7fg6q425lueq3s5ii98s85slek.apps.googleusercontent.com";
+      const GOOGLE_DRIVE_SCOPES = "https://www.googleapis.com/auth/drive.file";
+
+      // 1) A globally‐available GSI callback wrapper
+      window.handleGoogleTokenResponse = () => {
+        console.warn("Google Token Response arrived before your handler was defined");
+      };
+
+      // 2) A robust updater that looks up DOM/globals at call time
+      window.updateGDriveButtonState = function () {
+        console.log("Updating GDrive Button State. Client:", !!window.googleTokenClient, "Picker:", !!window.pickerApiLoaded, "JWT:", !!window.jwtToken, "Notes:", !!(window.notesMD && window.notesMD.trim()));
+        const btn = document.getElementById("save-gdrive-btn");
+        if (!btn) return;
+        const ready = !!(window.googleTokenClient && window.pickerApiLoaded);
+        const notesExist = !!(window.notesMD && window.notesMD.trim());
+        const enabled = ready && !!window.jwtToken && notesExist;
+        btn.disabled = !enabled;
+        btn.classList.toggle("hidden", !enabled);
+      };
+
+      function onGoogleGsiLoad() {
+        window.googleTokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: GOOGLE_CLIENT_ID,
+          scope: GOOGLE_DRIVE_SCOPES,
+          // wrap so it always calls the *current* global handler
+          callback: resp => window.handleGoogleTokenResponse(resp)
+        });
+        console.log("onGoogleGsiLoad fired. Client:", window.googleTokenClient);
+        window.gisInited = true;
         window.updateGDriveButtonState();
-      });
-    }
+      }
+
+      function onGoogleApiLoad() {
+        gapi.load("picker", () => {
+          console.log("gapi.load('picker') callback fired."); // Add this log
+          window.pickerApiLoaded = true; // Make sure this line exists and is correct
+          console.log("onGoogleApiLoad -> picker loaded. Flag:", window.pickerApiLoaded); // Log *after* setting
+          window.updateGDriveButtonState(); // Update state *after* flag is set
+        });
+      }
     </script>
+
 
     <script src="https://accounts.google.com/gsi/client" 
     defer
@@ -160,6 +176,15 @@
       const $ = selector => {
         if (selector.startsWith("#")) selector = selector.slice(1);
         return document.getElementById(selector);
+      };
+
+      window.jwtToken = localStorage.getItem(JWT_TOKEN_KEY);
+      window.notesMD = "";
+
+      window.handleGoogleTokenResponse = (tokenResponse) => {
+        window.googleAccessToken = tokenResponse.access_token;
+        console.log("Google access token:", window.googleAccessToken);
+        window.updateGDriveButtonState();
       };
 
       let isLoginMode = true; // Renamed from isLogin to avoid conflict
@@ -367,6 +392,7 @@
       // Check token status on initial load
       updateAuthUI();
       if (!jwtToken) {
+        console.log("updateAuthUI - JWT Token:", window.jwtToken);
         openModal(); // Open login if not logged in
       }
 
@@ -660,7 +686,8 @@
       }
 
       function renderNotes(markdown) {
-        notesMD = markdown;
+        window.notesMD = markdown;
+        console.log("renderNotes - Notes MD Length:", window.notesMD?.length);
         notesSection.classList.remove("hidden");
         togglePreviewBtn.classList.remove("hidden");
         dlBtn.disabled = !(notesMD && jwtToken);
@@ -742,6 +769,11 @@
           }
 
           const data = await res.json();
+
+          console.log("Summarize API response status:", res.status);
+          // console.log("Summarize API response data:", data);
+          // console.log("Outline content from API:", data.outline);
+
           renderNotes(data.outline);
           updateStatus("ready", "Notes generated");
         } catch (err) {
@@ -868,6 +900,7 @@
             localStorage.removeItem(LOCAL_STORAGE_KEY); // Clear corrupted data
           }
         }
+        console.log("loadSession - Notes MD Length:", window.notesMD?.length);
         // Update UI elements based on loaded content
         sumBtn.disabled = !(full.textContent.trim() && jwtToken);
         dlBtn.disabled = !(notesMD && jwtToken);
@@ -875,13 +908,6 @@
         updateGDriveButtonState();
         updateClearAllButtonVisibility(); // Ensure button visibility is correct on load
       }
-
-      // --- Google Drive Integration --- 
-      window.updateGDriveButtonState = () => {
-        const enabled = window.gisInited && window.pickerApiLoaded && notesMD && jwtToken;
-        saveGDriveBtn.disabled = !enabled;
-        saveGDriveBtn.classList.toggle("hidden", !enabled);
-      };
 
       window.handleGoogleTokenResponse = (tokenResponse) => {
         googleAccessToken = tokenResponse.access_token;
