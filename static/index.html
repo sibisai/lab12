@@ -100,6 +100,10 @@
         <span class="close-button" id="close-login-modal">&times;</span> <!-- Close button -->
         <h2 id="login-title">Login</h2>
         <form id="login-form">
+          <div class="input-group" id="fullname-group" style="display:none">
+            <input id="login-fullname" name="full_name"
+            type="text" placeholder="Full Name" autocomplete="name">
+          </div>
           <div class="input-group">
             <input id="login-email" type="email" placeholder="Email" autocomplete="email" required>
           </div>
@@ -199,6 +203,8 @@
       const modal = $("login-modal");
       const title = $("login-title");
       const form = $("login-form");
+      const fullnameInput = $("login-fullname");
+      const fullnameGrp = $("fullname-group");
       const email = $("login-email");
       const pwd = $("login-password");
       const confirmInput = $("login-confirm");
@@ -278,10 +284,14 @@
         title.textContent = isLoginMode ? "Login" : "Sign up";
         submitB.textContent = isLoginMode ? "Log in" : "Sign up";
         toggle.textContent = isLoginMode ? "Create an account" : "Already registered? Log in";
+
         confGrp.style.display = isLoginMode ? "none" : "block";
+        fullnameGrp.style.display = isLoginMode ? "none" : "block";
         confirmInput.required = !isLoginMode;
+        fullnameInput.required = !isLoginMode;
+
         pwd.placeholder = isLoginMode ? "Password" : "Enter a password";
-        confirmInput.value = "";
+        confirmInput.value = fullnameInput.value = "";
         errMsg.textContent = okMsg.textContent = "";
       }
 
@@ -304,7 +314,9 @@
         const fd = new FormData();
         fd.append("username", email.value);
         fd.append("password", pwd.value);
-
+        if (!isLoginMode) {
+          fd.append("full_name", fullnameInput.value.trim());
+        }
         try {
           const res = await fetch(endpoint, {
             method: "POST",

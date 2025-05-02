@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.responses import JSONResponse
-from fastapi import Cookie
+from fastapi import Cookie, Form
 from pydantic import BaseModel, Field
 from typing import Optional, Annotated
 from vosk import Model, KaldiRecognizer
@@ -229,15 +229,17 @@ class Token(BaseModel):
 
 
 @app.post("/register", status_code=201)
-async def register(
-    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+async def register(                                             # ← rewritten
+    username:   str = Form(...),
+    password:   str = Form(...),
+    full_name:  str | None = Form(...),         # optional (make ... if required)
     db: AsyncSession = Depends(get_db),
 ):
     # check uniqueness
-    if await crud.get_user_by_username(db, form_data.username):
+    if await crud.get_user_by_username(db, username):
         raise HTTPException(status_code=400, detail="Username already taken")
 
-    user = await crud.create_user(db, form_data.username, form_data.password)
+    user = await crud.create_user(db, username, password, full_name)
     return {"username": user.username, "created_at": user.created_at}
 
 

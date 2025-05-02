@@ -27,11 +27,12 @@ async def get_user_by_username(db: AsyncSession, username: str) -> Optional[User
     return res.scalar_one_or_none()
 
 
-async def create_user(db: AsyncSession, username: str, password: str) -> User:
+async def create_user(db: AsyncSession, username: str, password: str, full_name:str | None = None,) -> User:
     hashed = _pwd_ctx.hash(password)
     user = User(
         username=username,
         hashed_password=hashed,
+        full_name = full_name,
         usage_period_start=datetime.datetime.now(datetime.timezone.utc),
     )
     db.add(user)
