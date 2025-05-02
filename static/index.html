@@ -93,7 +93,7 @@
         <h2 id="login-title">Login</h2>
         <form id="login-form">
           <div class="input-group">
-            <input id="login-email" type="email" placeholder="Email" required>
+            <input id="login-email" type="email" placeholder="Email" autocomplete="username" required>
           </div>
           <div class="input-group">
             <input id="login-password" type="password" placeholder="Password" required>
@@ -220,10 +220,8 @@
       const GOOGLE_APP_ID = GOOGLE_CLIENT_ID.split("-")[0];
 
       let ws, audioCtx, processor, stream, running = false, paused = false;
-      let notesMD = "";
       let saveTimeout;
       let isPreviewMode = true;
-      let googleTokenClient;
       let googleAccessToken = null;
       let pickerOpenRequested = false;
 
@@ -371,7 +369,7 @@
         }
         // Update button states that depend on login status
         sumBtn.disabled = !(full.textContent.trim() && jwtToken);
-        dlBtn.disabled = !(notesMD && jwtToken);
+        dlBtn.disabled = !(window.notesMD && jwtToken);
         dlBtn.classList.toggle("hidden", dlBtn.disabled);
         updateGDriveButtonState();
         // Also update clear button visibility based on content and login status
@@ -690,7 +688,7 @@
         console.log("renderNotes - Notes MD Length:", window.notesMD?.length);
         notesSection.classList.remove("hidden");
         togglePreviewBtn.classList.remove("hidden");
-        dlBtn.disabled = !(notesMD && jwtToken);
+        dlBtn.disabled = !(window.notesMD && jwtToken);
         dlBtn.classList.toggle("hidden", dlBtn.disabled);
         updateGDriveButtonState();
 
@@ -788,12 +786,12 @@
       }
 
       function exportNotesToPdf() {
-        if (!notesMD) return;
+        if (!window.notesMD) return;
         if (!jwtToken) { openModal(); return; } // Check auth
 
-        const titleMatch = notesMD.match(/^#\s*(.+)$/m);
+        const titleMatch = window.notesMD.match(/^#\s*(.+)$/m);
         let baseName = titleMatch ? titleMatch[1].trim() : "lecture-notes";
-        const dateMatch = notesMD.match(/^\*\*Date & Time:\*\*\s*(.+)$/m);
+        const dateMatch = window.notesMD.match(/^\*\*Date & Time:\*\*\s*(.+)$/m);
         if (dateMatch) {
           const safeDate = dateMatch[1].replace(/, /g, "_").replace(/ at /i, "_").replace(/[:\s]+/g, "-").replace(/[^0-9A-Za-z\-_]/g, "");
           baseName = `${baseName}_${safeDate}`;
@@ -808,7 +806,7 @@
         fetchWithAuth("/download-pdf", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ markdown_content: notesMD })
+          body: JSON.stringify({ markdown_content: window.notesMD })
         })
           .then(res => {
             if (!res.ok) {
@@ -832,7 +830,7 @@
             alert(`Failed to download PDF: ${err.message}`);
           })
           .finally(() => {
-            dlBtn.disabled = !(notesMD && jwtToken);
+            dlBtn.disabled = !(window.notesMD && jwtToken);
             dlBtn.innerHTML = "⬇️ Download PDF";
           });
       }
@@ -846,7 +844,7 @@
         log.innerHTML = "";
         full.textContent = "";
         notes.innerHTML = "";
-        notesMD = "";
+        window.notesMD = "";
         notesSection.classList.add("hidden");
         sumBtn.disabled = true;
         dlBtn.disabled = true;
@@ -864,7 +862,7 @@
       function toggleNotePreview() {
         isPreviewMode = !isPreviewMode;
         togglePreviewBtn.textContent = isPreviewMode ? "Raw" : "Preview";
-        renderNotes(notesMD); // Re-render with the new mode
+        renderNotes(window.notesMD); // Re-render with the new mode
       }
 
       // --- Session Saving/Loading --- 
@@ -874,7 +872,7 @@
           const sessionData = {
             logHTML: log.innerHTML,
             fullText: full.textContent,
-            notesMarkdown: notesMD,
+            notesMarkdown:window.notesMD,
             customInstructions: customInstructionsTextarea.value
           };
           localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(sessionData));
@@ -903,7 +901,7 @@
         console.log("loadSession - Notes MD Length:", window.notesMD?.length);
         // Update UI elements based on loaded content
         sumBtn.disabled = !(full.textContent.trim() && jwtToken);
-        dlBtn.disabled = !(notesMD && jwtToken);
+        dlBtn.disabled = !(window.notesMD && jwtToken);
         dlBtn.classList.toggle("hidden", dlBtn.disabled);
         updateGDriveButtonState();
         updateClearAllButtonVisibility(); // Ensure button visibility is correct on load
@@ -919,40 +917,50 @@
       };
 
       function requestGoogleAccessToken() {
+        console.log("requestGoogleAccessToken called.")
         if (!window.googleTokenClient) {
           console.warn("GSI client not ready yet");
           return;
         }
-        if (googleTokenClient) {
+        if (window.googleTokenClient) {
+          console.log("Calling googleTokenClient.requestAccessToken...");
           // Prompt the user to select a Google Account and ask for consent to share their data
           // when establishing a new session.
-          googleTokenClient.requestAccessToken({ prompt: "consent" });
+          window.googleTokenClient.requestAccessToken({ prompt: "consent" });
         } else {
           console.error("Google Token Client not initialized.");
         }
       }
 
       function openGooglePicker() {
-        if (!notesMD) return;
-        if (!jwtToken) { openModal(); return; }
+        console.log("openGooglePicker called.");
+        if (!window.notesMD) { console.log("openGooglePicker: No notesMD"); return; }
+        if (!jwtToken) { console.log("openGooglePicker: No jwtToken"); openModal(); return; }
 
         pickerOpenRequested = true;
+        console.log("openGooglePicker: Checking googleAccessToken:", googleAccessToken);
+
         if (googleAccessToken) {
+          console.log("openGooglePicker: Access token exists, calling createPicker...");
+
           createPicker();
         } else {
+          console.log("openGooglePicker: Access token MISSING, calling requestGoogleAccessToken...");
+
           requestGoogleAccessToken();
         }
       }
 
       function createPicker() {
+        console.log("createPicker called.");
         if (!googleAccessToken || !window.pickerApiLoaded) {
           console.error("Cannot create picker: Missing token or Picker API not loaded.");
           return;
         }
 
-        const titleMatch = notesMD.match(/^#\s*(.+)$/m);
+        const titleMatch = window.notesMD.match(/^#\s*(.+)$/m);
         let baseName = titleMatch ? titleMatch[1].trim() : "lecture-notes";
-        const dateMatch = notesMD.match(/^\*\*Date & Time:\*\*\s*(.+)$/m);
+        const dateMatch = window.notesMD.match(/^\*\*Date & Time:\*\*\s*(.+)$/m);
         if (dateMatch) {
           const safeDate = dateMatch[1].replace(/, /g, "_").replace(/ at /i, "_").replace(/[:\s]+/g, "-").replace(/[^0-9A-Za-z\-_]/g, "");
           baseName = `${baseName}_${safeDate}`;
@@ -972,6 +980,7 @@
           // .setDeveloperKey(GOOGLE_API_KEY) // API Key might not be needed for Picker with OAuth
           .setCallback((data) => pickerCallback(data, filename))
           .build();
+          console.log("Building and showing picker...");
         picker.setVisible(true);
       }
 
@@ -993,7 +1002,7 @@
               parents: [folder.id]
             };
 
-            const multipartRequestBody = `${delimiter}Content-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}${delimiter}Content-Type: text/markdown\r\n\r\n${notesMD}${close_delim}`;
+            const multipartRequestBody = `${delimiter}Content-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}${delimiter}Content-Type: text/markdown\r\n\r\n${window.notesMD}${close_delim}`;
 
             const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
               method: "POST",
