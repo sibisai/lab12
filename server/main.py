@@ -424,16 +424,9 @@ async def summarize(
         raise HTTPException(status_code=500, detail=f"Error calling OpenAI API: {e}")
     
 
-# ── Markdown helpers ───────────────────────────────────────────────────────
-STYLE_RE = re.compile(r"<style.*?</style>", flags=re.S)
-
-def md_to_html(md: str) -> str:
-    """Loose HTML for Drive – keeps everything."""
-    return markdown2.markdown(md, extras=["fenced-code-blocks", "tables"])
-
 # ── /save-to-drive (Protected) ──────────────────────────────────────────────
 class DriveSaveReq(BaseModel):
-    notes_content: str
+    notes_html: str
     filename: str
     folder_id: str
     google_access_token: str
@@ -444,21 +437,31 @@ class DriveSaveResp(BaseModel):
     folder_id: str
 
 @app.post("/save-to-drive", response_model=DriveSaveResp)
-async def save_to_drive(r: DriveSaveReq, current_user: Annotated[str, Depends(get_current_user_from_cookie)]):
+async def save_to_drive(r: DriveSaveReq, current_user: Annotated[str, Depends(get_current_user_from_cookie)]): # Use your cookie dependency
     logger.info(f"Save to Google Drive request received for user: {current_user}, folder: {r.folder_id}")
-    
+
     try:
         # Create credentials object from the access token provided by the frontend
         creds = Credentials(token=r.google_access_token)
-        
-        # Build the Drive v3 service
+
+        # Configure http_client with timeout if needed
+        # http_client = httplib2.Http(timeout=300)
+        # service = build('drive', 'v3', credentials=creds, http=http_client)
+        # OR use default timeout:
         service = build('drive', 'v3', credentials=creds)
 
-        html_body = STYLE_BLOCK + md_to_html(r.notes_content)
+
+        # *** CHANGE: Use received HTML, skip markdown conversion ***
+        # html_body = STYLE_BLOCK + md_to_html(r.notes_content) # Old way
+        html_body = STYLE_BLOCK + r.notes_html # New way - Prepend style
+
+        # Still sanitize on backend for safety and consistency
         clean_html = bleach.clean(html_body,
-                          tags   = ALLOWED_TAGS.union({"style"}),
+                          tags   = ALLOWED_TAGS.union({"style"}), # Make sure style tag is allowed
                           strip  = True,
                           attributes = ALLOWED_ATTRS)
+        logger.info(f"Size of HTML body being uploaded: {len(clean_html.encode('utf-8'))} bytes")
+
 
         # 2) Drive metadata – tell Drive we want a Google Doc
         file_metadata = {
@@ -467,7 +470,7 @@ async def save_to_drive(r: DriveSaveReq, current_user: Annotated[str, Depends(ge
           "parents": [r.folder_id]
         }
 
-        # 3) media upload – send the html blob, *not* markdown
+        # 3) media upload – send the cleaned html blob
         media = MediaIoBaseUpload(
           BytesIO(clean_html.encode("utf-8")),
           mimetype="text/html",          # importable format
@@ -479,16 +482,26 @@ async def save_to_drive(r: DriveSaveReq, current_user: Annotated[str, Depends(ge
           media_body=media,
           fields="id,name" # Request name as well
         ).execute()
-        
+
         logger.info(f"File '{file.get('name')}' (ID: {file.get('id')}) created successfully in Drive for user {current_user}.")
         return DriveSaveResp(file_id=file.get("id"), file_name=file.get("name"), folder_id=r.folder_id)
 
     except HttpError as error:
-        logger.error(f"An error occurred saving to Google Drive for user {current_user}: {error}")
-        raise HTTPException(status_code=500, detail=f"Google Drive API error: {error}")
+        logger.error(f"An Google Drive API error occurred for user {current_user}: {error}")
+         # Try to parse Google's error message if possible
+        detail = f"Google Drive API error: {error.resp.status} {error.reason}"
+        try:
+            error_content = json.loads(error.content.decode('utf-8'))
+            if 'error' in error_content and 'message' in error_content['error']:
+                detail = f"Google Drive Error: {error_content['error']['message']}"
+        except Exception:
+            pass # Ignore parsing errors, use generic message
+        raise HTTPException(status_code=error.resp.status if error.resp else 500, detail=detail)
+
     except Exception as e:
         logger.error(f"Unexpected error saving to Google Drive for user {current_user}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {e}")
+        raise HTTPException(status_code=500, detail=f"Unexpected error saving to Drive: {e}")
+    
 
 # ── /feedback (Protected) ─────────────────────────────────────────────────── ADDED
 class FeedbackReq(BaseModel):

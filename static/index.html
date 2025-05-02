@@ -932,17 +932,41 @@
         picker.setVisible(true);
         // console.log("picker.setVisible(true) called."); // Log after setVisible
       }
-
-     async function pickerCallback(data, filename) {
+      async function pickerCallback(data, filename) {
         if (data.action === google.picker.Action.PICKED) {
           const folder = data.docs[0];
           const folderId = folder.id;
           const folderName = folder.name; // Good to have for logging/status
           // console.log(`Folder selected: ${folderName} (ID: ${folderId}). Preparing to call backend.`);
 
-          // Ensure we have everything needed
-          if (!window.notesMD || !folderId || !googleAccessToken || !filename) {
-            console.error("Missing data for backend save:", { hasNotes: !!window.notesMD, folderId, hasToken: !!googleAccessToken, filename });
+          // -------- START: Generate HTML like Copy Button --------
+          let generatedHtml;
+          try {
+            if (!window.notesMD) { // Check if notesMD exists first
+              throw new Error("Notes markdown is empty.");
+            }
+            // Ensure DOMPurify is loaded (it's included in your <head>)
+            if (typeof DOMPurify === 'undefined') {
+              throw new Error("DOMPurify library is not loaded.");
+            }
+            const dirtyHtml = marked.parse(window.notesMD);
+            generatedHtml = DOMPurify.sanitize(dirtyHtml, { USE_PROFILES: { html: true } });
+            // console.log("Generated sanitized HTML for Drive upload.");
+          } catch (err) {
+            console.error("Error generating/sanitizing HTML for Drive:", err);
+            alert(`Failed to prepare notes for saving: ${err.message}`);
+            // Optional: Re-enable button if preparation fails
+            saveGDriveBtn.disabled = false;
+            saveGDriveBtn.innerHTML = "💾 Save to Google Drive";
+            updateStatus("error", `Failed to prepare notes: ${err.message}`);
+            return;
+          }
+          // -------- END: Generate HTML --------
+
+
+          // Ensure we have everything needed (check generatedHtml instead of notesMD)
+          if (!generatedHtml || !folderId || !googleAccessToken || !filename) {
+            console.error("Missing data for backend save:", { hasNotes: !!generatedHtml, folderId, hasToken: !!googleAccessToken, filename });
             alert("Cannot save to drive: missing required information.");
             return;
           }
@@ -953,15 +977,17 @@
 
           try {
             // Call YOUR backend endpoint
-            const res = await fetchWithAuth("/save-to-drive", { // Use fetchWithAuth for your JWT
+            const res = await fetchWithAuth("/save-to-drive", { // Use fetchWithAuth
               method: "POST",
-              credentials: "include",
+              credentials: "include", // Assuming you use cookies now based on backend code
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                notes_content: window.notesMD, // Send the markdown
-                filename: filename,         // Send the desired filename (backend might adjust extension)
+                // *** CHANGE: Send HTML instead of Markdown ***
+                notes_html: generatedHtml,       // <--- SEND THIS
+                // notes_content: window.notesMD, // <--- REMOVE THIS
+                filename: filename,
                 folder_id: folderId,
-                google_access_token: googleAccessToken // Send the Google token
+                google_access_token: googleAccessToken
               })
             });
 
@@ -973,7 +999,7 @@
             }
 
             // console.log("Backend save successful:", result);
-            // Use the filename returned by the backend if it adjusts it (e.g., adds .gdoc conceptually)
+            // Use the filename returned by the backend
             const savedFileName = result.file_name || filename;
             alert(`Notes saved successfully to Google Drive as '${savedFileName}'!`);
             updateStatus("ready", `Saved as '${savedFileName}'`);
@@ -985,14 +1011,12 @@
           } finally {
             saveGDriveBtn.disabled = false; // Re-enable button
             saveGDriveBtn.innerHTML = "💾 Save to Google Drive";
-            // updateGDriveButtonState(); // Re-check state might hide button if notes were cleared, etc.
           }
         } else if (data.action === google.picker.Action.CANCEL) {
           console.log("Google Picker cancelled by user.");
           updateStatus("ready", "Save to Drive cancelled.");
         }
       }
-
       // --- Event Listeners --- 
       startBtn.onclick = () => { running ? stopRecording() : startRecording(); };
       pauseBtn.onclick = togglePause;
