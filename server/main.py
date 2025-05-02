@@ -19,7 +19,6 @@ from pydantic import BaseModel, Field
 from typing import Optional, Annotated
 from vosk import Model, KaldiRecognizer
 from openai import AsyncOpenAI
-import markdown2
 import bleach
 from io import BytesIO
 from jose import JWTError, jwt
@@ -34,7 +33,11 @@ from contextlib import asynccontextmanager
 from server.db import engine, get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from server import crud
+from server.crud import DEFAULT_PLANS
 from server.seed import seed_subscription_plans
+import asyncio, aiocron
+from sqlalchemy import insert, update            # ← for token‑save & cron
+from server.models import User, UserToken        # ← ORM classes
 # Google API Imports
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
@@ -251,14 +254,15 @@ async def login_for_access_token(
     user = await crud.authenticate_user(db, form_data.username, form_data.password)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
-
+    
+    secure_cookie = not os.getenv("DEV_INSECURE")
     access_token = create_access_token({"sub": user.username})
     resp = JSONResponse({"username": user.username})
     resp.set_cookie(
         key="access_token",
         value=access_token,
         httponly=True,
-        secure=True,          # ✓ only over HTTPS
+        secure=secure_cookie,          # ✓ only over HTTPS
         samesite="lax",
         max_age=JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         path="/",
@@ -290,6 +294,35 @@ async def get_current_user_from_cookie(
 @app.get("/me")
 async def get_current_user_route(current_user: str = Depends(get_current_user_from_cookie)):
     return {"username": current_user}
+
+@aiocron.crontab('0 3 * * *')        # every day at 03:00 UTC
+async def reset_monthly_usage():
+    async with AsyncSession(engine) as db:
+        thirty = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=30)
+        await db.execute(
+            update(User)
+            .where(User.usage_period_start < thirty)
+            .values(
+                summarize_call_count = 0,
+                usage_period_start   = datetime.datetime.now(datetime.timezone.utc)
+            )
+        )
+        await db.commit()
+
+PLAN_MAP: dict[str, dict] = {p["name"]: p for p in DEFAULT_PLANS}
+FREE_PLAN = PLAN_MAP["free"]
+
+@app.get("/me/quota")
+async def quota_api(
+    current_user: str = Depends(get_current_user_from_cookie),
+    db: AsyncSession  = Depends(get_db)
+):
+    u = await crud.get_user_by_username(db, current_user)
+    plan = PLAN_MAP.get(u.subscription_plan, FREE_PLAN)
+    return {
+        "remaining": plan["quota"] - u.summarize_call_count,
+        "plan": plan
+    }
 
 # ── WebSocket: streaming STT (Protected) ───────────────────────────────────
 @app.websocket("/ws/stt")
@@ -339,24 +372,26 @@ async def websocket_stt(ws: WebSocket):
             pass 
 
 # ── /summarize (Protected & Rate Limited) ───────────────────────────────────
+from server.quota import enforce_quota
 
 class SumReq(BaseModel):
-    transcript: str = Field(..., alias="transcript")
-    custom_instructions: Optional[str] = Field(None, alias="custom_instructions")
+    transcript: str
+    custom_instructions: str | None = None
 
-    class Config:
-        allow_population_by_field_name = True
+    model_config = {"populate_by_name": True}
 
 class SumResp(BaseModel):
     outline: str
+
 @app.post("/summarize", response_model=SumResp)
 @limiter.limit(f"{RATE_LIMIT_SUMMARIZE_MINUTE};{RATE_LIMIT_SUMMARIZE_DAY}")
 async def summarize(
     request: Request,
     r: SumReq,
-    current_user: Annotated[str, Depends(get_current_user_from_cookie)],
+    user: Annotated[User, Depends(enforce_quota)],
     db: AsyncSession = Depends(get_db),
 ):
+    current_user = user.username
     logger.info(f"Summarize request received for user: {current_user}")
     now = datetime.datetime.now().strftime("%B %d, %Y at %I:%M %p")
 
@@ -445,6 +480,23 @@ async def save_to_drive(r: DriveSaveReq, current_user: Annotated[str, Depends(ge
     try:
         # Create credentials object from the access token provided by the frontend
         creds = Credentials(token=r.google_access_token)
+        # ------- persist refresh‑token if present ------------------
+        if creds.refresh_token:
+            async with AsyncSession(engine) as db:
+                user_row = await crud.get_user_by_username(db, current_user)
+                await db.execute(
+                    insert(UserToken).values(
+                        user_id       = user_row.id,
+                        provider      = "google",
+                        refresh_token = creds.refresh_token,
+                        expires_at    = datetime.datetime.now(datetime.timezone.utc)
+                                        + datetime.timedelta(days=90)
+                    ).on_conflict_do_nothing(
+                        index_elements=["user_id", "provider"]
+                    )
+                )
+                await db.commit()
+        # -------------------------
 
         # Configure http_client with timeout if needed
         # http_client = httplib2.Http(timeout=300)

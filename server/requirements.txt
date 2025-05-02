@@ -8,6 +8,7 @@ python-dotenv
 markdown2
 slowapi
 redis
+aicron
 # fpdf2
 bleach
 
