@@ -93,7 +93,7 @@ async def store_feedback(
 
 # ── Subscription plan seeding (idempotent) ──────────────────────────────────
 DEFAULT_PLANS: Sequence[dict] = (
-    {"name": "free", "quota": 20, "price": 0.00},
+    {"name": "free", "quota": 25, "price": 0.00},
     {"name": "pro", "quota": 100, "price": 4.99},
 )
 

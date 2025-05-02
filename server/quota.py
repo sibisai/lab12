@@ -54,7 +54,7 @@ async def enforce_quota(
     if user.summarize_call_count >= plan["quota"]:
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail=f"Quota exceeded for plan '{user.subscription_plan}'.",
+            detail=f"Quota exceeded for {user.subscription_plan} plan.",
         )
 
     return user
