@@ -4,6 +4,23 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- CLEAN CSP — no comments, no frame‑ancestors when using <meta>, add style‑src -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self';
+               base-uri 'self';
+               object-src 'none';
+               script-src 'self' 'unsafe-inline' blob:
+                          https://cdnjs.cloudflare.com
+                          https://cdn.jsdelivr.net
+                          https://accounts.google.com
+                          https://apis.google.com;
+               worker-src 'self' blob:;
+               style-src 'self' 'unsafe-inline';
+               img-src 'self' data:;
+               font-src 'self' https://fonts.gstatic.com;
+               connect-src 'self' https://accounts.google.com https://www.googleapis.com ws:;
+               frame-src https://accounts.google.com https://picker.googleapis.com">
+
+
   <link rel="icon" href="./favicon/favicon.ico">
   <title>lab12</title> <!-- Updated title -->
   <script>window.currentUser = null;</script>
@@ -13,8 +30,12 @@
 
   <!-- ––– Markdown renderer ––– -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" referrerpolicy="no-referrer"></script>
-
-  <!-- ––––– Google Identity Services –––––                     -->
+  <!-- ––– HTML sanitizer ––– -->
+  <!-- CORRECT SRI for DOMPurify 3.0.7 (CDNJS / jsDelivr sha384) -->
+<!-- from cdnjs.com, verified 3 × -->
+<!-- grabbed from https://cdnjs.com/libraries/dompurify (v3.0.7) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.7/purify.min.js"></script>
+    <!-- ––––– Google Identity Services –––––                     -->
     <script>
       const GOOGLE_CLIENT_ID = "1024744015168-0nni6g7fg6q425lueq3s5ii98s85slek.apps.googleusercontent.com";
       const GOOGLE_DRIVE_SCOPES = "https://www.googleapis.com/auth/drive.file";
@@ -58,9 +79,7 @@
     </script>
 
 
-    <script src="https://accounts.google.com/gsi/client" 
-    defer
-    onload="onGoogleGsiLoad()"></script>
+    <script id="gsi" src="https://accounts.google.com/gsi/client" defer></script>
 
     <!-- ––––– Google JS API loader (for Picker) –––––            -->
     <script src="https://apis.google.com/js/api.js?onload=onGoogleApiLoad"  defer></script>
@@ -175,6 +194,7 @@
         return document.getElementById(selector);
       };
 
+      document.getElementById('gsi').addEventListener('load', onGoogleGsiLoad);
 
       window.notesMD = "";
 
@@ -670,21 +690,29 @@
 
       function renderNotes(markdown) {
         window.notesMD = markdown;
-        // console.log("renderNotes - Notes MD Length:", window.notesMD?.length);
+
+        // --- UI toggles ---
         notesSection.classList.remove("hidden");
         togglePreviewBtn.classList.remove("hidden");
         dlBtn.disabled = !(window.notesMD && currentUser);
         dlBtn.classList.toggle("hidden", dlBtn.disabled);
         updateGDriveButtonState();
 
+        // --- Render ---
         if (isPreviewMode) {
-          notes.innerHTML = marked.parse(markdown);
+          const dirty = marked.parse(markdown);                     // Markdown → HTML
+          const clean = DOMPurify.sanitize(dirty, {                 // scrub XSS
+            USE_PROFILES: { html: true }
+          });
+          notes.innerHTML = clean;                                  // safe HTML
         } else {
-          notes.textContent = markdown;
+          notes.textContent = markdown;                             // raw MD
         }
+
+        // --- bookkeeping ---
         notes.scrollTop = 0;
         saveSession();
-        updateClearAllButtonVisibility(); // Update button visibility
+        updateClearAllButtonVisibility();
       }
 
       // --- Actions --- 

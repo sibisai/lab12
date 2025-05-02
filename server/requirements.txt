@@ -9,6 +9,7 @@ markdown2
 slowapi
 redis
 fpdf2
+bleach
 
 # database + migrations
 sqlalchemy[asyncio]>=2.0

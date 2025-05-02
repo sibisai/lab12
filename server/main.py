@@ -20,6 +20,7 @@ from typing import Optional, Annotated
 from vosk import Model, KaldiRecognizer
 from openai import AsyncOpenAI
 import markdown2
+import bleach
 from io import BytesIO
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -55,6 +56,10 @@ JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "a-very-strong-secret-key-please-ch
 JWT_ALGORITHM = "HS256"
 JWT_ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", 60)) # Token validity period
 
+# ── HTML sanitising helpers ────────────────────────────────────────────────
+EXTRA_TAGS   = {"h1", "h2", "table", "thead", "tbody"}          # anything you need
+ALLOWED_TAGS = bleach.sanitizer.ALLOWED_TAGS.union(EXTRA_TAGS)  # ← use .union()
+
 # ── Rate Limiting Settings ──────────────────────────────────────────────────
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 RATE_LIMIT_SUMMARIZE_MINUTE = os.getenv("RATE_LIMIT_SUMMARIZE_MINUTE", "5/minute")
@@ -73,6 +78,36 @@ async def lifespan(app: FastAPI):
 
 # ── Create FastAPI with lifespan ─────────────────────────────────────────
 app = FastAPI(lifespan=lifespan)
+
+# ── Content‑Security‑Policy ────────────────────────────────────────────────
+@app.middleware("http")
+async def add_csp_header(request: Request, call_next):
+    resp = await call_next(request)
+    resp.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        # passive content
+        "img-src 'self' data:; "
+        "font-src 'self' https://fonts.gstatic.com; "
+        "style-src 'self' 'unsafe-inline'; "
+
+        # active content
+        "script-src 'self' 'unsafe-inline' blob: "
+            "https://cdnjs.cloudflare.com "
+            "https://cdn.jsdelivr.net "
+            "https://accounts.google.com "
+            "https://apis.google.com; "
+
+        # workers / worklets (Chrome falls back to script-src but add it for spec compliance)
+        "worker-src 'self' blob:; "
+
+        # back‑end calls & WebSockets
+        "connect-src 'self' https://accounts.google.com https://www.googleapis.com ws:; "
+
+        # iframes / Google picker
+        "frame-src https://accounts.google.com https://picker.googleapis.com; "
+    )
+    return resp
+
 
 # ── JWT Utility Functions ───────────────────────────────────────────────────
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -375,8 +410,9 @@ async def save_to_drive(r: DriveSaveReq, current_user: Annotated[str, Depends(ge
         
         # Build the Drive v3 service
         service = build('drive', 'v3', credentials=creds)
-        
-        html_body = markdown_to_html(r.notes_content)
+
+        html_body  = markdown_to_html(r.notes_content)
+        clean_html = bleach.clean(html_body, tags=ALLOWED_TAGS, strip=True)
 
         # 2) Drive metadata – tell Drive we want a Google Doc
         file_metadata = {
@@ -387,7 +423,7 @@ async def save_to_drive(r: DriveSaveReq, current_user: Annotated[str, Depends(ge
 
         # 3) media upload – send the html blob, *not* markdown
         media = MediaIoBaseUpload(
-          BytesIO(html_body.encode("utf-8")),
+          BytesIO(clean_html.encode("utf-8")),
           mimetype="text/html",          # importable format
           resumable=True
         )
@@ -426,6 +462,8 @@ async def download_pdf(r: PdfReq, current_user: Annotated[str, Depends(get_curre
             r.markdown_content,
             extras=["fenced-code-blocks", "tables"]
         )
+        safe_html = bleach.clean(html_content, tags=ALLOWED_TAGS, strip=True)
+
 
         # 2) Build PDF and render HTML
         pdf = PDF()
@@ -446,7 +484,7 @@ async def download_pdf(r: PdfReq, current_user: Annotated[str, Depends(get_curre
             )
 
         # 4) Write HTML (will preserve <h1>, <ul>/<li>, <strong>, <em>, tables, etc.)
-        pdf.write_html(html_content)
+        pdf.write_html(safe_html)
 
         # 5) Output as bytes
         raw = pdf.output(dest="S")     # returns a bytearray
