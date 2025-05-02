@@ -1,25 +1,108 @@
-# crud.py
-from sqlalchemy import select
+"""
+server/crud.py
+Asynchronous helper functions for DB access.
+"""
+
+import datetime
+from typing import Optional, Sequence
+
+from sqlalchemy import select, update, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from passlib.context import CryptContext
-import server.models as models
 
-pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
+from server.models import (
+    User,
+    UserFeedback,
+    SummarizeCall,
+    SubscriptionPlan,
+)
 
-async def get_user_by_username(db: AsyncSession, username: str):
-    q = await db.execute(select(models.User).where(models.User.username == username))
-    return q.scalars().first()
+# ── Password hashing ────────────────────────────────────────────────────────
+_pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-async def create_user(db: AsyncSession, username: str, password: str):
-    hashed = pwd_ctx.hash(password)
-    user = models.User(username=username, hashed_password=hashed)
+
+# ── User helpers ────────────────────────────────────────────────────────────
+async def get_user_by_username(db: AsyncSession, username: str) -> Optional[User]:
+    res = await db.execute(select(User).where(User.username == username))
+    return res.scalar_one_or_none()
+
+
+async def create_user(db: AsyncSession, username: str, password: str) -> User:
+    hashed = _pwd_ctx.hash(password)
+    user = User(
+        username=username,
+        hashed_password=hashed,
+        usage_period_start=datetime.datetime.now(datetime.timezone.utc),
+    )
     db.add(user)
     await db.commit()
     await db.refresh(user)
     return user
 
-async def authenticate_user(db: AsyncSession, username: str, password: str):
+
+async def authenticate_user(
+    db: AsyncSession, username: str, password: str
+) -> Optional[User]:
     user = await get_user_by_username(db, username)
-    if not user or not pwd_ctx.verify(password, user.hashed_password):
+    if not user or not _pwd_ctx.verify(password, user.hashed_password):
         return None
     return user
+
+
+# ── Usage & analytics helpers ───────────────────────────────────────────────
+async def bump_usage(
+    db: AsyncSession,
+    user_id: int,
+    transcript_len: int,
+    tokens_used: int,
+) -> None:
+    """Atomically increment usage counters and log the call."""
+    # 1) atomic UPDATE
+    await db.execute(
+        update(User)
+        .where(User.id == user_id)
+        .values(
+            summarize_call_count=User.summarize_call_count + 1,
+            last_summarize_at=datetime.datetime.now(datetime.timezone.utc),
+        )
+    )
+
+    # 2) per‑call log
+    db.add(
+        SummarizeCall(
+            user_id=user_id,
+            transcript_length=transcript_len,
+            tokens_used=tokens_used,
+        )
+    )
+
+    await db.commit()
+
+
+# ── Feedback helpers ────────────────────────────────────────────────────────
+async def store_feedback(
+    db: AsyncSession, user_id: int, feedback_json: dict
+) -> UserFeedback:
+    fb = UserFeedback(user_id=user_id, feedback=feedback_json)
+    db.add(fb)
+    await db.commit()
+    await db.refresh(fb)
+    return fb
+
+
+# ── Subscription plan seeding (idempotent) ──────────────────────────────────
+DEFAULT_PLANS: Sequence[dict] = (
+    {"name": "free", "quota": 20, "price": 0.00},
+    {"name": "pro", "quota": 100, "price": 4.99},
+)
+
+
+async def seed_subscription_plans(db: AsyncSession) -> None:
+    """Insert default plans once; ignores duplicates."""
+    stmt = (
+        insert(SubscriptionPlan)
+        .values(DEFAULT_PLANS)
+        .on_conflict_do_nothing(index_elements=["name"])
+    )
+    await db.execute(stmt)
+    await db.commit()

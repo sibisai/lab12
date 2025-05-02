@@ -5,45 +5,35 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <!-- CLEAN CSP — no comments, no frame‑ancestors when using <meta>, add style‑src -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self';
-               base-uri 'self';
-               object-src 'none';
-               script-src 'self' 'unsafe-inline' blob:
-                          https://cdnjs.cloudflare.com
-                          https://cdn.jsdelivr.net
-                          https://accounts.google.com
-                          https://apis.google.com;
-               worker-src 'self' blob:;
-               style-src 'self' 'unsafe-inline';
-               img-src 'self' data:;
-               font-src 'self' https://fonts.gstatic.com;
-               connect-src 'self' https://accounts.google.com https://www.googleapis.com ws:;
-               frame-src https://accounts.google.com https://picker.googleapis.com">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self';
+                  base-uri 'self';
+                  object-src 'none';
+                  script-src 'self' 'unsafe-inline' blob:
+                              https://cdnjs.cloudflare.com
+                              https://cdn.jsdelivr.net
+                              https://accounts.google.com
+                              https://apis.google.com;
+                  worker-src 'self' blob:;
+                  style-src 'self' 'unsafe-inline';
+                  img-src 'self' data:;
+                  font-src 'self' https://fonts.gstatic.com;
+                  connect-src 'self' https://accounts.google.com https://www.googleapis.com ws:;
+                  frame-src https://accounts.google.com https://picker.googleapis.com https://docs.google.com 
+                  ">
 
 
-  <link rel="icon" href="./favicon/favicon.ico">
-  <title>lab12</title> <!-- Updated title -->
-  <script>window.currentUser = null;</script>
-  <!-- ––––– PDF helper –––––                                   -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" crossorigin="anonymous"
-    referrerpolicy="no-referrer"></script>
+      <link rel="icon" href="./favicon/favicon.ico">
+      <title>lab12</title> <!-- Updated title -->
+      <script>window.currentUser = null;</script>
 
-  <!-- ––– Markdown renderer ––– -->
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" referrerpolicy="no-referrer"></script>
-  <!-- ––– HTML sanitizer ––– -->
-  <!-- CORRECT SRI for DOMPurify 3.0.7 (CDNJS / jsDelivr sha384) -->
-<!-- from cdnjs.com, verified 3 × -->
-<!-- grabbed from https://cdnjs.com/libraries/dompurify (v3.0.7) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.7/purify.min.js"></script>
+      <!-- ––– Markdown renderer ––– -->
+      <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" referrerpolicy="no-referrer"></script>
+      <!-- HTML sanitizer -->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.7/purify.min.js"></script>
     <!-- ––––– Google Identity Services –––––                     -->
     <script>
       const GOOGLE_CLIENT_ID = "1024744015168-0nni6g7fg6q425lueq3s5ii98s85slek.apps.googleusercontent.com";
       const GOOGLE_DRIVE_SCOPES = "https://www.googleapis.com/auth/drive.file";
-
-      // 1) A globally‐available GSI callback wrapper
-      window.handleGoogleTokenResponse = () => {
-        console.warn("Google Token Response arrived before your handler was defined");
-      };
 
       // 2) A robust updater that looks up DOM/globals at call time
       window.updateGDriveButtonState = function () {
@@ -79,7 +69,7 @@
     </script>
 
 
-    <script id="gsi" src="https://accounts.google.com/gsi/client" defer></script>
+    <script id="gsi" src="https://accounts.google.com/gsi/client" defer onload="onGoogleGsiLoad()"></script>
 
     <!-- ––––– Google JS API loader (for Picker) –––––            -->
     <script src="https://apis.google.com/js/api.js?onload=onGoogleApiLoad"  defer></script>
@@ -194,8 +184,6 @@
         return document.getElementById(selector);
       };
 
-      document.getElementById('gsi').addEventListener('load', onGoogleGsiLoad);
-
       window.notesMD = "";
 
       window.handleGoogleTokenResponse = (tokenResponse) => {
@@ -233,7 +221,6 @@
       const wsProtocol = location.protocol === "https:" ? "wss" : "ws";
       const WS_BASE_URL = `${wsProtocol}://${location.host}/ws/stt`;
       const LOCAL_STORAGE_KEY = "liveNoteSession";
-      const GOOGLE_API_KEY = "AIzaSyA0ouQQjhgCL6KTCnKzxCqdqMYW4aZjCTo"; // Replace with your actual API key if needed
       const GOOGLE_APP_ID = GOOGLE_CLIENT_ID.split("-")[0];
 
       let ws, audioCtx, processor, stream, running = false, paused = false;
@@ -637,13 +624,6 @@
               // console.warn("not sending chunk—ws.ready?", ws.readyState, "paused?", paused);
             }
           };
-
-          // Optional: Revoke URL when context closes, though browser might handle it
-          // audioCtx.onstatechange = () => {
-          //   if (audioCtx.state === 'closed') {
-          //     URL.revokeObjectURL(workletURL);
-          //   }
-          // };
 
         } catch (err) {
           console.error("Error accessing microphone or setting up audio:", err);

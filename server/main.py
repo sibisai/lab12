@@ -12,7 +12,7 @@ from dotenv import load_dotenv # Import dotenv
 from fastapi import FastAPI, WebSocket, WebSocketException, Response, HTTPException, Depends, status, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.responses import JSONResponse
 from fastapi import Cookie
 from pydantic import BaseModel, Field
@@ -23,10 +23,9 @@ import markdown2
 import bleach
 from io import BytesIO
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from datetime import timedelta
 from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address, get_ipaddr
+from slowapi.util import get_ipaddr
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 import redis.asyncio as redis
@@ -34,7 +33,8 @@ import redis.asyncio as redis
 from contextlib import asynccontextmanager
 from server.db import engine, get_db
 from sqlalchemy.ext.asyncio import AsyncSession
-from server import crud, models
+from server import crud
+from server.seed import seed_subscription_plans
 # Google API Imports
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
@@ -65,16 +65,12 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 RATE_LIMIT_SUMMARIZE_MINUTE = os.getenv("RATE_LIMIT_SUMMARIZE_MINUTE", "5/minute")
 RATE_LIMIT_SUMMARIZE_DAY = os.getenv("RATE_LIMIT_SUMMARIZE_DAY", "100/day")
 
-# Password hashing context (using bcrypt)
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 # ── Lifespan: create tables on startup ───────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with engine.begin() as conn:
-        await conn.run_sync(models.Base.metadata.create_all)
+    # async with engine.begin() as conn:
+    #     await conn.run_sync(models.Base.metadata.create_all)
     yield
-    # no teardown
 
 # ── Create FastAPI with lifespan ─────────────────────────────────────────
 app = FastAPI(lifespan=lifespan)
@@ -104,7 +100,7 @@ async def add_csp_header(request: Request, call_next):
         "connect-src 'self' https://accounts.google.com https://www.googleapis.com ws:; "
 
         # iframes / Google picker
-        "frame-src https://accounts.google.com https://picker.googleapis.com; "
+        "frame-src https://accounts.google.com https://picker.googleapis.com https://docs.google.com; "
     )
     return resp
 
@@ -176,8 +172,11 @@ app.add_middleware(
 )
 
 # ── Redis connection on startup ─────────────────────────────────────────────
+
 @app.on_event("startup")
 async def startup():
+    async with AsyncSession(engine) as db:
+        await seed_subscription_plans(db)
     try:
         redis_conn = redis.from_url(REDIS_URL, encoding="utf-8", decode_responses=True)
         await redis_conn.ping() # Check connection
@@ -338,6 +337,7 @@ async def summarize(
     request: Request,
     r: SumReq,
     current_user: Annotated[str, Depends(get_current_user_from_cookie)],
+    db: AsyncSession = Depends(get_db),
 ):
     logger.info(f"Summarize request received for user: {current_user}")
     now = datetime.datetime.now().strftime("%B %d, %Y at %I:%M %p")
@@ -379,6 +379,17 @@ async def summarize(
             max_tokens=700,
         )
         md = chat.choices[0].message.content.strip()
+
+        # bump counters & log call
+        async with AsyncSession(engine) as db:
+            user = await crud.get_user_by_username(db, current_user)
+            await crud.bump_usage(
+                db,
+                user_id=user.id,
+                transcript_len=len(r.transcript),
+                tokens_used=chat.usage.total_tokens if chat.usage else 0
+            )
+
         return SumResp(outline=md)
     except Exception as e:
         logger.error(f"Error calling OpenAI API for user {current_user}: {e}", exc_info=True)
@@ -511,9 +522,12 @@ class FeedbackReq(BaseModel):
     feedback_text: str
 
 @app.post("/feedback")
-async def submit_feedback(r: FeedbackReq, current_user: Annotated[str, Depends(get_current_user_from_cookie)]):
+async def submit_feedback(r: FeedbackReq, current_user: Annotated[str, Depends(get_current_user_from_cookie)],
+db: AsyncSession = Depends(get_db)
+):
     logger.info(f"Feedback received from user '{current_user}': {r.feedback_text}")
-    # In a real application, you might save this to a database, send an email, etc.
+    user = await crud.get_user_by_username(db, current_user)
+    await crud.store_feedback(db, user.id, {"text": r.feedback_text})
     return {"message": "Feedback received successfully!"}
 
 
