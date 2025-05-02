@@ -57,8 +57,24 @@ JWT_ALGORITHM = "HS256"
 JWT_ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", 60)) # Token validity period
 
 # ── HTML sanitising helpers ────────────────────────────────────────────────
-EXTRA_TAGS   = {"h1", "h2", "table", "thead", "tbody"}          # anything you need
-ALLOWED_TAGS = bleach.sanitizer.ALLOWED_TAGS.union(EXTRA_TAGS)  # ← use .union()
+EXTRA_TAGS   = {"h1", "h2", "ul", "ol", "li", "br", "p"}       # bullets & breaks too
+ALLOWED_TAGS = bleach.sanitizer.ALLOWED_TAGS.union(EXTRA_TAGS) \
+                              .difference({"pre", "code"})
+
+ALLOWED_ATTRS          = bleach.sanitizer.ALLOWED_ATTRIBUTES.copy()
+ALLOWED_ATTRS["*"]     = ALLOWED_ATTRS.get("*", []) + ["style"]   # keep inline style rules
+
+# --- one CSS block we’ll prepend to every HTML export -------
+STYLE_BLOCK = """
+<style>
+  body { font-family: Helvetica, Arial, sans-serif; line-height: 1.4; }
+  h1   { font-size: 32px; margin: 0 0 24px; }
+  h2   { font-size: 20px; margin: 24px 0 12px; }
+  ul   { margin: 0 0 12px 28px; padding: 0; }
+  li   { margin: 6px 0; }
+  strong { font-weight: 600; }
+</style>
+"""
 
 # ── Rate Limiting Settings ──────────────────────────────────────────────────
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
@@ -390,11 +406,39 @@ async def summarize(
                 tokens_used=chat.usage.total_tokens if chat.usage else 0
             )
 
+        # inside summarize()
+        def fix_flat_lists(md: str) -> str:
+            """Turn ‘Key Terms – a – b – c’ into proper bullets."""
+            def _repl(m):
+                title, body = m.group(1), m.group(2)
+                items = [f"- {s.strip()}"    # split on “ - ”
+                    for s in re.split(r"\s*-\s+(?!-)", body) if s.strip()]
+                return f"**{title}:**\n" + "\n".join(items) + "\n"
+            
+            return re.sub(r"\*\*(Key Terms|Action Items)\*:?\s*(.+)", _repl, md)
+        
+        md = fix_flat_lists(md)
+
         return SumResp(outline=md)
     except Exception as e:
         logger.error(f"Error calling OpenAI API for user {current_user}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error calling OpenAI API: {e}")
     
+
+# ── Markdown helpers ───────────────────────────────────────────────────────
+STYLE_RE = re.compile(r"<style.*?</style>", flags=re.S)
+
+def md_to_html(md: str) -> str:
+    """Loose HTML for Drive – keeps everything."""
+    return markdown2.markdown(md, extras=["fenced-code-blocks", "tables"])
+
+def md_to_pdf_html(md: str) -> str:
+    """Tight HTML for FPDF – no <style>, no code blocks."""
+    raw = markdown2.markdown(md, extras=["fenced-code-blocks", "tables"])
+    raw = STYLE_RE.sub("", raw)                   # ① nuke <style> blocks
+    safe = bleach.clean(raw, tags=ALLOWED_TAGS, strip=True)
+    return safe
+
 # ── /save-to-drive (Protected) ──────────────────────────────────────────────
 class DriveSaveReq(BaseModel):
     notes_content: str
@@ -407,10 +451,6 @@ class DriveSaveResp(BaseModel):
     file_name: str
     folder_id: str
 
-
-def markdown_to_html(md: str) -> str:
-  return markdown2.markdown(md, extras=["fenced-code-blocks","tables"])
-
 @app.post("/save-to-drive", response_model=DriveSaveResp)
 async def save_to_drive(r: DriveSaveReq, current_user: Annotated[str, Depends(get_current_user_from_cookie)]):
     logger.info(f"Save to Google Drive request received for user: {current_user}, folder: {r.folder_id}")
@@ -422,8 +462,11 @@ async def save_to_drive(r: DriveSaveReq, current_user: Annotated[str, Depends(ge
         # Build the Drive v3 service
         service = build('drive', 'v3', credentials=creds)
 
-        html_body  = markdown_to_html(r.notes_content)
-        clean_html = bleach.clean(html_body, tags=ALLOWED_TAGS, strip=True)
+        html_body = STYLE_BLOCK + md_to_html(r.notes_content)
+        clean_html = bleach.clean(html_body,
+                          tags   = ALLOWED_TAGS.union({"style"}),
+                          strip  = True,
+                          attributes = ALLOWED_ATTRS)
 
         # 2) Drive metadata – tell Drive we want a Google Doc
         file_metadata = {
@@ -468,18 +511,11 @@ class PdfReq(BaseModel):
 async def download_pdf(r: PdfReq, current_user: Annotated[str, Depends(get_current_user_from_cookie)]):
     logger.info(f"PDF download request received for user: {current_user}")
     try:
-        # 1) Convert Markdown -> HTML
-        html_content = markdown2.markdown(
-            r.markdown_content,
-            extras=["fenced-code-blocks", "tables"]
-        )
-        safe_html = bleach.clean(html_content, tags=ALLOWED_TAGS, strip=True)
-
-
-        # 2) Build PDF and render HTML
         pdf = PDF()
         pdf.set_auto_page_break(auto=True, margin=15)
         pdf.add_page()
+
+        safe_html = md_to_pdf_html(r.markdown_content)
 
         # 3) Register a font that supports UTF-8 if available
         font_path = "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"
