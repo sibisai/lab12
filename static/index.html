@@ -26,7 +26,7 @@
 
       // 2) A robust updater that looks up DOM/globals at call time
       window.updateGDriveButtonState = function () {
-        console.log("Updating GDrive Button State. Client:", !!window.googleTokenClient, "Picker:", !!window.pickerApiLoaded, "JWT:", !!window.jwtToken, "Notes:", !!(window.notesMD && window.notesMD.trim()));
+        // console.log("Updating GDrive Button State. Client:", !!window.googleTokenClient, "Picker:", !!window.pickerApiLoaded, "JWT:", !!window.jwtToken, "Notes:", !!(window.notesMD && window.notesMD.trim()));
         const btn = document.getElementById("save-gdrive-btn");
         if (!btn) return;
         const ready = !!(window.googleTokenClient && window.pickerApiLoaded);
@@ -43,16 +43,16 @@
           // wrap so it always calls the *current* global handler
           callback: resp => window.handleGoogleTokenResponse(resp)
         });
-        console.log("onGoogleGsiLoad fired. Client:", window.googleTokenClient);
+        // console.log("onGoogleGsiLoad fired. Client:", window.googleTokenClient);
         window.gisInited = true;
         window.updateGDriveButtonState();
       }
 
       function onGoogleApiLoad() {
         gapi.load("picker", () => {
-          console.log("gapi.load('picker') callback fired."); // Add this log
+          // console.log("gapi.load('picker') callback fired."); // Add this log
           window.pickerApiLoaded = true; // Make sure this line exists and is correct
-          console.log("onGoogleApiLoad -> picker loaded. Flag:", window.pickerApiLoaded); // Log *after* setting
+          // console.log("onGoogleApiLoad -> picker loaded. Flag:", window.pickerApiLoaded); // Log *after* setting
           window.updateGDriveButtonState(); // Update state *after* flag is set
         });
       }
@@ -93,13 +93,13 @@
         <h2 id="login-title">Login</h2>
         <form id="login-form">
           <div class="input-group">
-            <input id="login-email" type="email" placeholder="Email" autocomplete="username" required>
+            <input id="login-email" type="email" placeholder="Email" autocomplete="email" required>
           </div>
           <div class="input-group">
-            <input id="login-password" type="password" placeholder="Password" required>
+            <input id="login-password" type="password" placeholder="Password" autocomplete="current-password"required>
           </div>
           <div class="input-group" id="confirm-group" style="display: none;">
-            <input id="login-confirm" name="password_cofirm" type="password" placeholder="Re-enter password">
+            <input id="login-confirm" name="password_cofirm" type="password" placeholder="Re-enter password" autocomplete="new-password">
           </div>
           <label style="font-size:14px; margin-bottom:15px; display:flex; align-items:center;">
             <input id="toggle-show-pwd" type="checkbox" style="margin-right:6px;">
@@ -390,7 +390,7 @@
       // Check token status on initial load
       updateAuthUI();
       if (!jwtToken) {
-        console.log("updateAuthUI - JWT Token:", window.jwtToken);
+        // console.log("updateAuthUI - JWT Token:", window.jwtToken);
         openModal(); // Open login if not logged in
       }
 
@@ -473,7 +473,7 @@
 
       // --- Status Update --- 
       function updateStatus(state, message) {
-        console.log(`Updating status: ${state} - ${message}`); // Debug log
+        // console.log(`Updating status: ${state} - ${message}`); // Debug log
         statusText.textContent = message;
         // Reset classes first
         statusDot.className = "status-dot";
@@ -626,10 +626,10 @@
 
           processor.port.onmessage = (event) => {
             if (ws && ws.readyState === WebSocket.OPEN && !paused) {
-              console.debug("sending audio chunk, bytes:", event.data.byteLength);
+              // console.debug("sending audio chunk, bytes:", event.data.byteLength);
               ws.send(event.data); // Send Int16Array audio chunk
             } else {
-              console.warn("not sending chunk—ws.ready?", ws.readyState, "paused?", paused);
+              // console.warn("not sending chunk—ws.ready?", ws.readyState, "paused?", paused);
             }
           };
 
@@ -685,7 +685,7 @@
 
       function renderNotes(markdown) {
         window.notesMD = markdown;
-        console.log("renderNotes - Notes MD Length:", window.notesMD?.length);
+        // console.log("renderNotes - Notes MD Length:", window.notesMD?.length);
         notesSection.classList.remove("hidden");
         togglePreviewBtn.classList.remove("hidden");
         dlBtn.disabled = !(window.notesMD && jwtToken);
@@ -768,7 +768,7 @@
 
           const data = await res.json();
 
-          console.log("Summarize API response status:", res.status);
+          // console.log("Summarize API response status:", res.status);
           // console.log("Summarize API response data:", data);
           // console.log("Outline content from API:", data.outline);
 
@@ -909,7 +909,7 @@
 
       window.handleGoogleTokenResponse = (tokenResponse) => {
         googleAccessToken = tokenResponse.access_token;
-        console.log("Google Access Token obtained.");
+        // console.log("Google Access Token obtained.");
         if (pickerOpenRequested) {
           createPicker();
           pickerOpenRequested = false;
@@ -917,13 +917,13 @@
       };
 
       function requestGoogleAccessToken() {
-        console.log("requestGoogleAccessToken called.")
+        // console.log("requestGoogleAccessToken called.")
         if (!window.googleTokenClient) {
           console.warn("GSI client not ready yet");
           return;
         }
         if (window.googleTokenClient) {
-          console.log("Calling googleTokenClient.requestAccessToken...");
+          // console.log("Calling googleTokenClient.requestAccessToken...");
           // Prompt the user to select a Google Account and ask for consent to share their data
           // when establishing a new session.
           window.googleTokenClient.requestAccessToken({ prompt: "consent" });
@@ -933,26 +933,26 @@
       }
 
       function openGooglePicker() {
-        console.log("openGooglePicker called.");
+        // console.log("openGooglePicker called.");
         if (!window.notesMD) { console.log("openGooglePicker: No notesMD"); return; }
         if (!jwtToken) { console.log("openGooglePicker: No jwtToken"); openModal(); return; }
 
         pickerOpenRequested = true;
-        console.log("openGooglePicker: Checking googleAccessToken:", googleAccessToken);
+        // console.log("openGooglePicker: Checking googleAccessToken:", googleAccessToken);
 
         if (googleAccessToken) {
-          console.log("openGooglePicker: Access token exists, calling createPicker...");
+          // console.log("openGooglePicker: Access token exists, calling createPicker...");
 
           createPicker();
         } else {
-          console.log("openGooglePicker: Access token MISSING, calling requestGoogleAccessToken...");
+          // console.log("openGooglePicker: Access token MISSING, calling requestGoogleAccessToken...");
 
           requestGoogleAccessToken();
         }
       }
 
       function createPicker() {
-        console.log("createPicker called.");
+        // console.log("createPicker called.");
         if (!googleAccessToken || !window.pickerApiLoaded) {
           console.error("Cannot create picker: Missing token or Picker API not loaded.");
           return;
@@ -972,7 +972,7 @@
           .setIncludeFolders(true)
           .setSelectFolderEnabled(true);
 
-        console.log("Building picker with folderView..."); // Log before build
+        // console.log("Building picker with folderView..."); // Log before build
 
         // Build the picker using the correct view variable:
         const picker = new google.picker.PickerBuilder()
@@ -984,9 +984,9 @@
           .enableFeature(google.picker.Feature.CREATE_NEW_FOLDER)
           .build();
 
-        console.log("Showing picker..."); // Log before setVisible
+        // console.log("Showing picker..."); // Log before setVisible
         picker.setVisible(true);
-        console.log("picker.setVisible(true) called."); // Log after setVisible
+        // console.log("picker.setVisible(true) called."); // Log after setVisible
       }
 
      async function pickerCallback(data, filename) {
@@ -994,7 +994,7 @@
           const folder = data.docs[0];
           const folderId = folder.id;
           const folderName = folder.name; // Good to have for logging/status
-          console.log(`Folder selected: ${folderName} (ID: ${folderId}). Preparing to call backend.`);
+          // console.log(`Folder selected: ${folderName} (ID: ${folderId}). Preparing to call backend.`);
 
           // Ensure we have everything needed
           if (!window.notesMD || !folderId || !googleAccessToken || !filename) {
@@ -1027,7 +1027,7 @@
               throw new Error(result.detail || `Backend Error ${res.status}`);
             }
 
-            console.log("Backend save successful:", result);
+            // console.log("Backend save successful:", result);
             // Use the filename returned by the backend if it adjusts it (e.g., adds .gdoc conceptually)
             const savedFileName = result.file_name || filename;
             alert(`Notes saved successfully to Google Drive as '${savedFileName}'!`);
