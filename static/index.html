@@ -1027,7 +1027,7 @@
             // console.log("Backend save successful:", result);
             // Use the filename returned by the backend
             const savedFileName = result.file_name || filename;
-            alert(`Notes saved successfully to Google Drive as '${savedFileName}'!`);
+            alert(`✅ Notes saved successfully to Google Drive as '${savedFileName}'!`);
             updateStatus("ready", `Saved as '${savedFileName}'`);
 
           } catch (err) {
