@@ -25,6 +25,7 @@
       <link rel="icon" href="./favicon/favicon.ico">
       <title>lab12</title> <!-- Updated title -->
       <script>window.currentUser = null;</script>
+      <script>window.currentUserFullName = null;</script>      
 
       <!-- ––– Markdown renderer ––– -->
       <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" referrerpolicy="no-referrer"></script>
@@ -260,11 +261,13 @@
       async function bootstrapAuth() {
         const res = await fetch("/me", { credentials: "include" });
         if (res.ok) {
-          const { username } = await res.json();
+          const { username, full_name } = await res.json();
           currentUser = username;
+          window.currentUserFullName = full_name;      // ← store full name
           updateAuthUI();
         } else {
           currentUser = null;
+          window.currentUserFullName = null;
           updateAuthUI();
         }
       }
@@ -386,7 +389,8 @@
         window.currentUser = currentUser; 
           if (currentUser) {
               fetchQuota(); 
-              userInfoSpan.textContent = `Logged in as: ${currentUser}`;
+              const name = window.currentUserFullName || currentUser;
+              userInfoSpan.textContent = `Welcome back, ${name}!`;
               userInfoSpan.classList.remove("hidden");
               authButton.textContent = "Logout";
               authButton.onclick = logout;

@@ -264,9 +264,17 @@ async def get_current_user_from_cookie(
     # reuse your existing verify_token()
     return verify_token(access_token, credentials_exception)
 
+class MeOut(BaseModel):
+    username: str
+    full_name: str | None
+
 @app.get("/me")
-async def get_current_user_route(current_user: str = Depends(get_current_user_from_cookie)):
-    return {"username": current_user}
+async def get_current_user_route(current_username: str = Depends(get_current_user_from_cookie),
+    db: AsyncSession = Depends(get_db),):
+    user = await crud.get_user_by_username(db, current_username)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return MeOut(username=user.username, full_name=user.full_name)
 
 PLAN_MAP: dict[str, dict] = {p["name"]: p for p in DEFAULT_PLANS}
 FREE_PLAN = PLAN_MAP["free"]
