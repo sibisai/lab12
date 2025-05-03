@@ -30,7 +30,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from contextlib import asynccontextmanager
 from server.db import engine, get_db
 from sqlalchemy.ext.asyncio import AsyncSession
-from server import crud
+from server import crud, mailer
 from server.crud import DEFAULT_PLANS
 from sqlalchemy import insert
 from server.models import User, UserToken        # ← ORM classes
@@ -54,6 +54,7 @@ load_dotenv()
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "a-very-strong-secret-key-please-change") # Secret for signing JWTs
 JWT_ALGORITHM = "HS256"
 JWT_ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", 60)) # Token validity period
+PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "http://localhost:8000")
 
 # ── HTML sanitising helpers ────────────────────────────────────────────────
 EXTRA_TAGS   = {"h1", "h2", "ul", "ol", "li", "br", "p"}       # bullets & breaks too
@@ -211,12 +212,29 @@ async def register(                                             # ← rewritten
     full_name:  str | None = Form(...),         # optional (make ... if required)
     db: AsyncSession = Depends(get_db),
 ):
-    # check uniqueness
+    logger.info(f"Registration attempt for username: {username}")
+    # 1) ensure unique
     if await crud.get_user_by_username(db, username):
         raise HTTPException(status_code=400, detail="Username already taken")
 
+    # 2) create the user (unverified)
     user = await crud.create_user(db, username, password, full_name)
-    return {"username": user.username, "created_at": user.created_at}
+
+    # 3) generate & send verification code
+    code = await crud.create_verification_code(db, user.username, user.id)
+    await mailer.send_verification_email(
+        recipient=user.username,
+        code=code,
+        public_base_url=PUBLIC_BASE_URL
+    )
+    logger.info(f"Sent verification PIN to {user.username}: {code}")
+
+    # 4) return the new user (frontend knows to show the “enter PIN” form)
+    return {
+        "username": user.username,
+        "created_at": user.created_at,
+        "verification_sent": True
+    }
 
 
 @app.post("/token")
@@ -227,6 +245,8 @@ async def login_for_access_token(
     user = await crud.authenticate_user(db, form_data.username, form_data.password)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    if not user.email_verified:
+        raise HTTPException(403, "Please verify your e‑mail first")
     
     secure_cookie = not os.getenv("DEV_INSECURE")
     access_token = create_access_token({"sub": user.username})
@@ -528,15 +548,48 @@ async def save_to_drive(r: DriveSaveReq, current_user: Annotated[str, Depends(ge
 class FeedbackReq(BaseModel):
     feedback_text: str
 
-@app.post("/feedback")
-async def submit_feedback(r: FeedbackReq, current_user: Annotated[str, Depends(get_current_user_from_cookie)],
-db: AsyncSession = Depends(get_db)
+@app.post("/feedback", status_code=201)
+async def submit_feedback(
+    r: FeedbackReq,
+    current_user: Annotated[str, Depends(get_current_user_from_cookie)],
+    db: AsyncSession = Depends(get_db),
 ):
-    logger.info(f"Feedback received from user '{current_user}': {r.feedback_text}")
-    user = await crud.get_user_by_username(db, current_user)
-    await crud.store_feedback(db, user.id, {"text": r.feedback_text})
-    return {"message": "Feedback received successfully!"}
+    await crud.store_feedback(db, (await crud.get_user_by_username(db, current_user)).id, {"text": r.feedback_text})
+    try:
+        await mailer.send_feedback_alert(r.feedback_text, current_user)
+    except Exception as e:
+        logger.error("feedback alert mail failed", exc_info=True)
+    return {"message": "Thanks for your feedback!"}
 
+class EmailReq(BaseModel): email: str
+class PinReq(BaseModel):  email: str; pin: str
+
+# send code ----------------------------------------------------
+
+@app.post("/email/verify/send")
+async def send_code(r: EmailReq, db=Depends(get_db)):
+    
+    code = await crud.create_verification_code(db, r.email)
+    await mailer.send_verification_email(r.email, code, PUBLIC_BASE_URL)
+    print('after send: code, email', code, r.email)
+    return {"detail": "sent"}
+
+# verify link  (HTML response so it works when user clicks) ----
+from fastapi.responses import HTMLResponse
+
+VERIFY_OK   = "<h1>Email verified ✅</h1><p>You can close this tab.</p>"
+VERIFY_FAIL = "<h1>Invalid or expired link ❌</h1>"
+
+@app.get("/verify", response_class=HTMLResponse)
+async def verify_via_link(email: str, pin: str, db: AsyncSession = Depends(get_db)):
+    ok = await crud.confirm_code(db, email, pin)
+    return VERIFY_OK if ok else VERIFY_FAIL
+
+@app.post("/email/verify/check")
+async def check_pin(r: PinReq, db=Depends(get_db)):
+    if not await crud.confirm_code(db, r.email, r.pin):
+        raise HTTPException(400, "Invalid or expired code")
+    return {"detail": "verified"}
 
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
 

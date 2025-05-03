@@ -1,10 +1,10 @@
 from datetime import datetime, timezone
 from sqlalchemy import (
-    Column, Integer, String, DateTime, Boolean,
-    JSON, ForeignKey, Numeric, Table
+    Column, Index, Integer, String, DateTime, Boolean,
+    JSON, ForeignKey, Numeric, Table, text, func
 )
 from sqlalchemy.orm import declarative_base, relationship
-
+from sqlalchemy.dialects.postgresql import UUID
 Base = declarative_base()
 
 # association for many-to-many user ↔ role
@@ -42,8 +42,14 @@ class User(Base):
                                       default=lambda: datetime.now(timezone.utc),
                                       onupdate=lambda: datetime.now(timezone.utc),
                                       nullable=True)
+    email_verified = Column(Boolean, default=False)
 
     # relationships
+    email_verifications = relationship(
+      "EmailVerification",
+      back_populates="user",
+      cascade="all, delete-orphan"
+    )
     feedback_entries         = relationship("UserFeedback", back_populates="user",
                                             cascade="all, delete-orphan")
     subscription_history     = relationship("UserSubscriptionHistory",
@@ -110,3 +116,20 @@ class Role(Base):
     id    = Column(Integer, primary_key=True)
     name  = Column(String, unique=True, nullable=False)
     users = relationship("User", secondary=user_roles, back_populates="roles")
+
+class EmailVerification(Base):
+    __tablename__ = "email_verifications"
+
+    id    = Column(Integer, primary_key=True)
+    user_id    = Column(Integer, ForeignKey("users.id"), nullable=False) 
+    email      = Column(String, nullable=False, index=True)
+    code       = Column(String(6), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    consumed   = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    user       = relationship("User", back_populates="email_verifications")
+
+Index("ix_email_unexpired",
+      EmailVerification.email,
+      EmailVerification.consumed,
+      EmailVerification.expires_at)

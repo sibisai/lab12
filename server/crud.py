@@ -3,9 +3,10 @@ server/crud.py
 Asynchronous helper functions for DB access.
 """
 
-import datetime
+import datetime, secrets
 from typing import Optional, Sequence
-
+from server.models import EmailVerification, User
+import sqlalchemy as sa
 from sqlalchemy import select, update, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from passlib.context import CryptContext
@@ -149,3 +150,40 @@ async def seed_roles(db: AsyncSession) -> None:
         .on_conflict_do_nothing(index_elements=["name"])
     )
     await db.commit()
+
+
+# --- Email verification ----------------------------------------------------
+
+async def create_verification_code(db: AsyncSession, email: str, user_id: int) -> str:
+    code = f"{secrets.randbelow(900000):06d}"
+    ev = EmailVerification(
+        email=email,
+        user_id=user_id,
+        code=code,
+        expires_at=datetime.datetime.utcnow() + datetime.timedelta(days=1)
+    )
+    db.add(ev)
+    await db.commit()
+    return code
+
+async def confirm_code(db, email, code) -> bool:
+    row = (
+        await db.execute(
+            select(EmailVerification)
+            .where(EmailVerification.email == email,
+                   EmailVerification.code == code,
+                   EmailVerification.consumed.is_(False),
+                   EmailVerification.expires_at > datetime.datetime.utcnow())
+            .with_for_update()                 # lock the row
+        )
+    ).scalar_one_or_none()
+
+    if not row:
+        return False
+
+    row.consumed = True
+    await db.execute(
+        sa.update(User).where(User.username == email).values(email_verified=True)
+    )
+    await db.commit()
+    return True
