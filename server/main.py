@@ -7,7 +7,6 @@ Audio: 16 kHz mono 16-bit PCM
 """
 
 import os, json, textwrap, datetime, re, logging # Import logging
-from urllib.parse import quote
 from dotenv import load_dotenv # Import dotenv
 from fastapi import FastAPI, WebSocket, WebSocketException, Response, HTTPException, Depends, status, Query, Request
 from fastapi.middleware.cors import CORSMiddleware

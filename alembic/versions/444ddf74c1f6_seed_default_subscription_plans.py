@@ -18,17 +18,34 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
-
 def upgrade() -> None:
-    op.execute("""
-        INSERT INTO subscription_plans (name, quota, price) VALUES
-        ('free', 25, 0.00),
-        ('pro',  100, 4.99)
-        ON CONFLICT (name) DO NOTHING;
-    """)
+    # 1) roles  (static lookup table)
+    op.create_table(
+        "roles",
+        sa.Column("id", sa.Integer, primary_key=True),
+        sa.Column("name", sa.String, unique=True, nullable=False),
+    )
+
+    # 2) user_roles  (many‑to‑many join)
+    op.create_table(
+        "user_roles",
+        sa.Column("user_id", sa.Integer, sa.ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+        sa.Column("role_id", sa.Integer, sa.ForeignKey("roles.id",  ondelete="CASCADE"), primary_key=True),
+    )
+
+    # 3) user_tokens  (OAuth refresh‑tokens etc.)
+    op.create_table(
+        "user_tokens",
+        sa.Column("id",         sa.Integer, primary_key=True),
+        sa.Column("user_id",    sa.Integer, sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("provider",   sa.String,  nullable=False),
+        sa.Column("refresh_token", sa.String, nullable=False),
+        sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
+    )
+
 
 def downgrade() -> None:
-    op.execute("""
-        DELETE FROM subscription_plans
-        WHERE name IN ('free','pro');
-    """)
+    op.drop_table("user_tokens")
+    op.drop_table("user_roles")
+    op.drop_table("roles")
+# ----------------------------------------------------------------------

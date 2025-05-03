@@ -15,7 +15,8 @@ from server.models import (
     UserFeedback,
     SummarizeCall,
     SubscriptionPlan,
-    UserSubscriptionHistory
+    UserSubscriptionHistory,
+    Role,
 )
 
 # ── Password hashing ────────────────────────────────────────────────────────
@@ -53,6 +54,14 @@ async def create_user(db: AsyncSession, username: str, password: str, full_name:
             started_at=datetime.datetime.now(datetime.timezone.utc),
         )
     )
+
+    default_role = (
+        await db.execute(
+            select(Role).where(Role.name == "user")
+        )
+    ).scalar_one()
+
+    user.roles.append(default_role)
 
     # 4) one final commit
     await db.commit()
