@@ -59,7 +59,7 @@ rm vosk-model-en-us-0.22.zip
 #    Make sure to fill in your DATABASE_URL, OPENAI_API_KEY, Google keys etc.
 
 # 6. Run the server (ensure PostgreSQL is running)
-python -m uvicorn main:app --host 0.0.0.0 --port 8000
+python -m server.uvicorn main:app
 
 # 7. Open the application in your browser
 # Then visit http://127.0.0.1:8000/
@@ -224,11 +224,11 @@ LAB12/
 │   └── vosk-model-small-en-us-…
 ├── server/                  # All backend code & config
 │   ├── __init__.py
-│   ├── auth.py
 │   ├── crud.py
 │   ├── db.py
 │   ├── main.py
 │   ├── models.py
+│   ├── quota.py
 │   ├── requirements.txt
 │   ├── Dockerfile
 │   └── tests/               # Unit & integration tests

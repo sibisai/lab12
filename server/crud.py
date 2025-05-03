@@ -12,6 +12,7 @@ from passlib.context import CryptContext
 
 from server.models import (
     User,
+    user_roles,
     UserFeedback,
     SummarizeCall,
     SubscriptionPlan,
@@ -61,7 +62,9 @@ async def create_user(db: AsyncSession, username: str, password: str, full_name:
         )
     ).scalar_one()
 
-    user.roles.append(default_role)
+    await db.execute(
+        insert(user_roles).values(user_id=user.id, role_id=default_role.id)
+    )
 
     # 4) one final commit
     await db.commit()
@@ -135,4 +138,14 @@ async def seed_subscription_plans(db: AsyncSession) -> None:
         .on_conflict_do_nothing(index_elements=["name"])
     )
     await db.execute(stmt)
+    await db.commit()
+
+DEFAULT_ROLES = ({"name": "user"}, )
+
+async def seed_roles(db: AsyncSession) -> None:
+    await db.execute(
+        insert(Role)
+        .values(DEFAULT_ROLES)
+        .on_conflict_do_nothing(index_elements=["name"])
+    )
     await db.commit()

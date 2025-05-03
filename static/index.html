@@ -1076,8 +1076,8 @@
             "text/plain": new Blob([window.notesMD], { type: "text/plain" })
           })
         ]).then(() => {
-          copyBtn.textContent = "✅";            // UX feedback
-          setTimeout(() => copyBtn.textContent = "Copy", 1200);
+          copyBtn.textContent = "✅ Copied";            // UX feedback
+          setTimeout(() => copyBtn.textContent = "📋 Copy", 1200);
         }).catch(err => {
           console.error("Clipboard write failed:", err);
           alert("Couldn’t copy – see console");
