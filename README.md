@@ -235,7 +235,7 @@ LAB12/
 │       ├── test_auth.py
 │       └── test_rate_limit.py
 └── README.md                # (this file)
-
+```
 ---
 
 ## How It Works
@@ -304,7 +304,7 @@ LAB12/
 - **Tests:** Basic tests for authentication and rate limiting are included. Run using `pytest`:
   ```bash
   pytest
-````
+```
 
 - **CI/CD:** Consider integrating tools like `flake8` (linting), `mypy` (type checking), and `pytest` into a Continuous Integration pipeline (e.g., GitHub Actions) to ensure code quality on each push.
 
@@ -326,3 +326,4 @@ This project utilizes several fantastic open-source libraries and services. Many
 - **Passlib:** For password hashing.
 
 Enjoy seamless, offline-first transcription and AI-powered note taking with lab12!
+````
