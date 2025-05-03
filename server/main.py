@@ -27,16 +27,13 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_ipaddr
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
-import redis.asyncio as redis
 # Db imports
 from contextlib import asynccontextmanager
 from server.db import engine, get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from server import crud
 from server.crud import DEFAULT_PLANS
-from server.seed import seed_subscription_plans
-import asyncio, aiocron
-from sqlalchemy import insert, update            # ← for token‑save & cron
+from sqlalchemy import insert
 from server.models import User, UserToken        # ← ORM classes
 # Google API Imports
 from google.oauth2.credentials import Credentials
@@ -80,7 +77,6 @@ STYLE_BLOCK = """
 """
 
 # ── Rate Limiting Settings ──────────────────────────────────────────────────
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 RATE_LIMIT_SUMMARIZE_MINUTE = os.getenv("RATE_LIMIT_SUMMARIZE_MINUTE", "5/minute")
 RATE_LIMIT_SUMMARIZE_DAY = os.getenv("RATE_LIMIT_SUMMARIZE_DAY", "100/day")
 
@@ -190,31 +186,9 @@ app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
 )
 
-# ── Redis connection on startup ─────────────────────────────────────────────
-
 @app.on_event("startup")
 async def startup():
-    async with AsyncSession(engine) as db:
-        await seed_subscription_plans(db)
-    try:
-        redis_conn = redis.from_url(REDIS_URL, encoding="utf-8", decode_responses=True)
-        await redis_conn.ping() # Check connection
-        limiter.storage = redis_conn
-        logger.info(f"Connected to Redis at {REDIS_URL} for rate limiting.")
-    except Exception as e:
-        logger.error(f"Error connecting to Redis at {REDIS_URL}: {e}")
-        # Fallback to in-memory limiter if Redis connection fails
-        logger.warning("Falling back to in-memory rate limiter.")
-        limiter.storage = None # Or use an in-memory storage explicitly if slowapi provides one
-
-@app.on_event("shutdown")
-async def shutdown():
-    if hasattr(limiter, 'storage') and limiter.storage: # Check if storage exists
-        try:
-            await limiter.storage.close()
-            logger.info("Redis connection closed.")
-        except Exception as e:
-            logger.error(f"Error closing Redis connection: {e}")
+    limiter.storage = None
 
 # ── Load Vosk model once ────────────────────────────────────────────────────
 if not os.path.exists(MODEL_PATH):
@@ -294,20 +268,6 @@ async def get_current_user_from_cookie(
 @app.get("/me")
 async def get_current_user_route(current_user: str = Depends(get_current_user_from_cookie)):
     return {"username": current_user}
-
-@aiocron.crontab('0 3 * * *')        # every day at 03:00 UTC
-async def reset_monthly_usage():
-    async with AsyncSession(engine) as db:
-        thirty = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=30)
-        await db.execute(
-            update(User)
-            .where(User.usage_period_start < thirty)
-            .values(
-                summarize_call_count = 0,
-                usage_period_start   = datetime.datetime.now(datetime.timezone.utc)
-            )
-        )
-        await db.commit()
 
 PLAN_MAP: dict[str, dict] = {p["name"]: p for p in DEFAULT_PLANS}
 FREE_PLAN = PLAN_MAP["free"]

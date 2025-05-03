@@ -15,6 +15,7 @@ from server.models import (
     UserFeedback,
     SummarizeCall,
     SubscriptionPlan,
+    UserSubscriptionHistory
 )
 
 # ── Password hashing ────────────────────────────────────────────────────────
@@ -36,8 +37,27 @@ async def create_user(db: AsyncSession, username: str, password: str, full_name:
         usage_period_start=datetime.datetime.now(datetime.timezone.utc),
     )
     db.add(user)
+    await db.flush() # ← assigns user.id without committing
+
+    free_plan = (
+        await db.execute(
+            select(SubscriptionPlan).where(SubscriptionPlan.name == "free")
+        )
+    ).scalar_one()
+
+    # 3) insert history row explicitly – no lazy load involved
+    db.add(
+        UserSubscriptionHistory(
+            user_id=user.id,
+            plan_id=free_plan.id,
+            started_at=datetime.datetime.now(datetime.timezone.utc),
+        )
+    )
+
+    # 4) one final commit
     await db.commit()
-    await db.refresh(user)
+    await db.refresh(user)      # if you need the fresh object back
+
     return user
 
 

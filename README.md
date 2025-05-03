@@ -132,8 +132,7 @@ This method uses Docker and Docker Compose to package the application and its de
   - Per‑minute limit: `RATE_LIMIT_SUMMARIZE_MINUTE` (default “5/minute”)
   - Per‑day limit: `RATE_LIMIT_SUMMARIZE_DAY` (default “100/day”)
 - **Storage:**
-  - **Redis‑backed:** If `REDIS_URL` is provided and reachable, limits persist across restarts.
-  - **In‑memory fallback:** If Redis is unavailable, limits reset on server restart.
+  - In‑memory SlowAPI store (limits reset on server restart; good enough until production traffic).
 
 ---
 
@@ -200,7 +199,6 @@ DATABASE_URL=postgresql+asyncpg://livenote:lab12admin@localhost:5432/livenote
 # Optional - Rate Limiting (defaults are often suitable)
 # RATE_LIMIT_SUMMARIZE_MINUTE=5/minute
 # RATE_LIMIT_SUMMARIZE_DAY=100/day
-# REDIS_URL=redis://localhost:6379 # Uncomment and configure if using Redis
 ```
 
 **Note:** Never commit your `.env` file to version control (add it to `.gitignore`).
@@ -214,7 +212,7 @@ LAB12/
 ├── .env                     # Local secrets (DO NOT COMMIT)
 ├── .gitignore
 ├── .dockerignore
-├── docker-compose.yml       # Compose entrypoint for app + Redis (optional)
+├── docker-compose.yml       # Compose entrypoint for app
 ├── LICENSE.md
 ├── README.md
 ├── static/                  # Frontend assets
@@ -242,7 +240,6 @@ LAB12/
 
 ## How It Works
 
-- **Authentication:** Browser sends `INITIAL_AUTH_SECRET` via POST to `/token` → Backend verifies secret → Backend issues JWT → JWT stored in browser local storage.
 - **Transcription:** Browser captures microphone audio → Sends audio chunks via WebSocket (`/ws/stt?token=<JWT>`) → Backend receives audio → Vosk performs Speech-to-Text → Backend sends partial/final transcript text back via WebSocket → Frontend displays transcript.
 - **Note Generation:** User clicks "Generate Notes" → Frontend sends full transcript via POST to `/summarize` (with JWT) → Backend sends text (+ custom instructions) to OpenAI API (GPT-4o) → OpenAI returns Markdown notes → Backend sends Markdown to frontend.
 - **Markdown Preview:** Frontend uses Marked.js library to render received Markdown as HTML in the notes preview pane.
@@ -294,12 +291,10 @@ LAB12/
   Explore incremental note generation as the transcript streams in.
 
 - **Improved UI/UX**
-
-  - More intuitive controls, responsive design
-  - Drag‑and‑drop or multi‑window support
+  More intuitive controls, responsive design
 
 - **Export Formats**
-  Offer additional download options (plain text, Word `.docx`, etc.).
+  Offer additional download options (plain text, PDF, Word `.docx`, etc.).
 
 ---
 
@@ -329,6 +324,5 @@ This project utilizes several fantastic open-source libraries and services. Many
 - **SQLAlchemy, asyncpg, psycopg2-binary:** For database interaction.
 - **python-dotenv:** For managing environment variables.
 - **Passlib:** For password hashing.
-- **Redis:** As an optional backend for rate limiting.
 
 Enjoy seamless, offline-first transcription and AI-powered note taking with lab12!

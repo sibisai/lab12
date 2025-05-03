@@ -1,28 +1,33 @@
 fastapi==0.111.*
 uvicorn[standard]==0.29.*
+
+# speech + websockets
 vosk==0.3.*
 websockets==12.*
+
+# data / validation / AI
 pydantic==2.*
 openai>=1.3.8
-python-dotenv
-markdown2
-slowapi
-redis
-aicron
-# fpdf2
+markdown2          # still used for md→html preview on the frontend
 bleach
+
+# scheduling / rate‑limit helper
+slowapi
+aiocron            # cron‑style resets
+
+# secrets & env
+python-dotenv
 
 # database + migrations
 sqlalchemy[asyncio]>=2.0
 asyncpg>=0.27
 psycopg2-binary>=2.9
-
-# migrations
 alembic>=1.10
 
 # security
 passlib[bcrypt]>=1.7
 
+# Google Drive
 google-api-python-client
 google-auth-oauthlib
 google-auth-httplib2
