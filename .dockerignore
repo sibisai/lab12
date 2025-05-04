@@ -1,16 +1,17 @@
-# ignore local venv
-venv/
-# ignore model/download artifacts
-models/
-*.zip
-# Python cache
+# Python
 __pycache__/
 *.py[cod]
-# dotenv & IDE files
+*.pyo
+venv/
+
+# Docker / build artifacts
+models/           # your 1.8 GB model folder!
+*.zip
+
+# Environment
 .env
 *.env
-*.log
-.idea/
+
+# IDEs
 .vscode/
-# Ignore your local zip plus any other archives
-*.zip
+.idea/

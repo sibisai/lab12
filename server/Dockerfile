@@ -1,40 +1,35 @@
-# Use an official Python runtime as a parent image
+# Use an official slim Python image
 FROM python:3.10-slim
 
-# Prevent Python from writing .pyc files and buffer stdout/stderr
+# Don’t write .pyc files, unbuffer stdout/stderr
 ENV PYTHONDONTWRITEBYTECODE=1 \
   PYTHONUNBUFFERED=1
 
-# Install system dependencies:
-# - curl & unzip for Vosk model download
-# - wkhtmltopdf for PDF generation via pdfkit
-# - libatomic1 (required by Vosk’s native libvosk.so)
+# Install OS packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
-  curl \
-  unzip \
-  wkhtmltopdf \
-  libatomic1 \
+  curl unzip wkhtmltopdf libatomic1 \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
 WORKDIR /app
 
-# Copy and install Python dependencies
+# Install Python deps first (so mounts below don’t bust your cache)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Download & extract the Vosk model (~1.8 GB)
-RUN curl -L -o vosk-model-en-us-0.22.zip \
+# Download & unpack Vosk model at build time
+RUN curl -L -o vosk.zip \
   https://alphacephei.com/vosk/models/vosk-model-en-us-0.22.zip \
-  && unzip vosk-model-en-us-0.22.zip -d models \
-  && rm vosk-model-en-us-0.22.zip
+  && unzip vosk.zip -d models \
+  && rm vosk.zip
 
-# Copy the rest of the application code (main.py, static/, etc.)
-COPY . .
+# Copy your application code
+COPY server/ server/
+COPY static/ /app/static/
+# (or `COPY . .` if your root only contains app code)
 
-# Expose the port FastAPI will run on
 EXPOSE 8000
 
-# Run the app with Uvicorn
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "server.main:app", \
+  "--host", "0.0.0.0", "--port", "8000", \
+  "--workers", "4", "--proxy-headers"]

@@ -405,7 +405,7 @@
           pinInput.required = false;
         } else if (mode === "verify") {
           title.textContent = "Verify Email";
-          okMsg.textContent = "Enter the 6‑digit code."; // Initial message
+          okMsg.textContent = "Check your inbox for the code"; // Initial message
           submitB.textContent = "Verify";
           email.parentElement.style.display = "block";
           email.readOnly = true; // Make email read-only
@@ -496,12 +496,14 @@
               body: JSON.stringify({ email: email.value })
             });
             okMsg.textContent = "If that email exists, code was sent";
+            submitB.disabled = true;
             // switch to verify step after a moment
             setTimeout(() => updateModalUI(RESET_VERIFY), 2000);
             return;
           }
 
           if (authMode === RESET_VERIFY) {
+            submitB.disabled = false;
             // validate new pw/confirm match
             if (pwd.value !== confirmInput.value) throw new Error("Passwords don't match");
             const res = await fetch("/auth/password-reset/verify", {
@@ -538,7 +540,7 @@
               // un‑verified user: switch to the verify UI
               verificationEmail = email.value;      // remember which email
               updateModalUI("verify");             // show the PIN input
-              okMsg.textContent = "Check your inbox for the code.";
+              okMsg.textContent = "Check your inbox for the code";
               // submitB.disabled = false;
               // submitB.textContent = "Verify";
               return;
