@@ -192,6 +192,7 @@
         <h2>Feedback</h2>
         <form id="feedback-form">
           <textarea id="feedback-text" placeholder="Enter your feedback here..." required></textarea>
+          <p id="feedback-msg"></p>
           <div class="feedback-buttons">
             <button type="submit" id="submit-feedback">Submit</button>
             <button type="button" id="cancel-feedback">Cancel</button>
@@ -257,7 +258,7 @@
       const cancelFeedbackBtn = $("cancel-feedback");
       const feedbackText = $("feedback-text");
       const submitFeedbackBtn = $("submit-feedback"); // Get submit button
-
+      const msg = document.getElementById("feedback-msg");
       const wsProtocol = location.protocol === "https:" ? "wss" : "ws";
       const WS_BASE_URL = `${wsProtocol}://${location.host}/ws/stt`;
       const LOCAL_STORAGE_KEY = "liveNoteSession";
@@ -806,15 +807,16 @@
           });
 
           if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            if (res.status === 402) throw new Error(err.detail); // quota
-            throw new Error(err.detail || `HTTP ${res.status}`);
+            msg.textContent = err.detail || "Submission failed.";
+            msg.style.color = "red";
+          } else {
+            msg.textContent = "✅ Thanks for your feedback!";
+            msg.style.color = "green";
+            // auto‑close in a few seconds:
+            setTimeout(closeFeedbackModal, 1500);
           }
 
           const result = await res.json();
-          console.log("Feedback submission result:", result);
-          alert("Thank you for your feedback!");
-          closeFeedbackModal();
         } catch (err) {
           console.error("Error submitting feedback:", err);
           alert(`Failed to submit feedback: ${err.message}`);
