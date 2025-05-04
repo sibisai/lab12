@@ -8,7 +8,7 @@ Audio: 16 kHz mono 16-bit PCM
 
 import os, json, textwrap, datetime, re, logging # Import logging
 from dotenv import load_dotenv # Import dotenv
-from fastapi import FastAPI, WebSocket, WebSocketException, Response, HTTPException, Depends, status, Query, Request
+from fastapi import FastAPI, WebSocket, WebSocketException, HTTPException, Depends, status, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordRequestForm
@@ -30,10 +30,11 @@ from slowapi.middleware import SlowAPIMiddleware
 from contextlib import asynccontextmanager
 from server.db import engine, get_db
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import delete
 from server import crud, mailer
-from server.crud import DEFAULT_PLANS
+from server.crud import get_user_by_username, DEFAULT_PLANS
 from sqlalchemy import insert
-from server.models import User, UserToken        # ← ORM classes
+from server.models import User, UserToken, EmailVerification, UserSubscriptionHistory, user_roles
 # Google API Imports
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
@@ -566,13 +567,58 @@ class PinReq(BaseModel):  email: str; pin: str
 
 # send code ----------------------------------------------------
 
-@app.post("/email/verify/send")
-async def send_code(r: EmailReq, db=Depends(get_db)):
-    
-    code = await crud.create_verification_code(db, r.email)
+@app.post("/email/verify/send", summary="Resend a verification code")
+async def resend_code(
+    r: EmailReq,
+    db: AsyncSession = Depends(get_db),
+):
+    user = await crud.get_user_by_username(db, r.email)
+    if not user:
+        raise HTTPException(404, "User not found")
+
+    if user.email_verified:
+        return {"detail": "Already verified"}
+
+    code = await crud.create_verification_code(db, r.email, user.id)
     await mailer.send_verification_email(r.email, code, PUBLIC_BASE_URL)
-    print('after send: code, email', code, r.email)
-    return {"detail": "sent"}
+    return {"detail": "Verification code resent"}
+
+
+
+@app.post("/email/verify/cancel", summary="Cancel a pending signup")
+async def cancel_verification(
+    r: EmailReq,
+    db: AsyncSession = Depends(get_db),
+):
+    # 1) Look up the user
+    user = await get_user_by_username(db, r.email)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # 2) Blow away any outstanding verification codes
+    await db.execute(
+        delete(EmailVerification)
+        .where(EmailVerification.user_id == user.id)
+    )
+
+    # 3) (Optionally) wipe out any other related rows you created at signup
+    await db.execute(
+        delete(UserSubscriptionHistory)
+        .where(UserSubscriptionHistory.user_id == user.id)
+    )
+    await db.execute(
+        delete(user_roles)
+        .where(user_roles.c.user_id == user.id)
+    )
+
+    # 4) Finally delete the user row itself
+    await db.execute(
+        delete(User)
+        .where(User.id == user.id)
+    )
+
+    await db.commit()
+    return {"detail": "Signup canceled; you may sign up again"}
 
 # verify link  (HTML response so it works when user clicks) ----
 from fastapi.responses import HTMLResponse
@@ -585,7 +631,7 @@ async def verify_via_link(email: str, pin: str, db: AsyncSession = Depends(get_d
     ok = await crud.confirm_code(db, email, pin)
     return VERIFY_OK if ok else VERIFY_FAIL
 
-@app.post("/email/verify/check")
+@app.post("/email/verify/check", summary="Verify a PIN code")
 async def check_pin(r: PinReq, db=Depends(get_db)):
     if not await crud.confirm_code(db, r.email, r.pin):
         raise HTTPException(400, "Invalid or expired code")
@@ -598,4 +644,3 @@ if __name__ == "__main__":
     import uvicorn
     logger.info("Starting server with uvicorn...")
     uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
-

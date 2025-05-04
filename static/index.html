@@ -96,35 +96,46 @@
     </div>
 
     <!-- Authentication Modal -->
-    <div id="login-modal" class="login-page" style="display: none;"> <!-- Initially hidden -->
-      <div class="login-container">
-        <span class="close-button" id="close-login-modal">&times;</span> <!-- Close button -->
-        <h2 id="login-title">Login</h2>
-        <form id="login-form">
-          <div class="input-group" id="fullname-group" style="display:none">
-            <input id="login-fullname" name="full_name"
-            type="text" placeholder="Full Name" autocomplete="name">
-          </div>
-          <div class="input-group">
-            <input id="login-email" type="email" placeholder="Email" autocomplete="email" required>
-          </div>
-          <div class="input-group">
-            <input id="login-password" type="password" placeholder="Password" autocomplete="current-password"required>
-          </div>
-          <div class="input-group" id="confirm-group" style="display: none;">
-            <input id="login-confirm" name="password_confirm" type="password" placeholder="Re-enter password" autocomplete="new-password">
-          </div>
-          <label style="font-size:14px; margin-bottom:15px; display:flex; align-items:center;">
-            <input id="toggle-show-pwd" type="checkbox" style="margin-right:6px;">
-            Show password
-          </label>
-          <p id="login-error" style="color:red;   height:1.2em;"></p>
-          <p id="login-success" style="color:green; height:1.2em;"></p>
-          <button type="submit" class="login-btn" id="login-submit">Log in</button>
-          <p id="login-toggle" class="signup-link">Create an account</p>
-        </form>
+<div id="login-modal" class="login-page" style="display: none;">
+  <div class="login-container">
+    <span class="close-button" id="close-login-modal">&times;</span>
+    <h2 id="login-title">Login</h2>
+    <form id="login-form">
+      <div class="input-group" id="fullname-group" style="display:none">
+        <input id="login-fullname" name="full_name" type="text" placeholder="Full Name" autocomplete="name">
       </div>
-    </div>
+      <div class="input-group">
+        <input id="login-email" type="email" placeholder="Email" autocomplete="email" required>
+      </div>
+      <div class="input-group" id="password-group"> <input id="login-password" type="password" placeholder="Password"
+          autocomplete="current-password" required>
+      </div>
+      <div class="input-group" id="confirm-group" style="display: none;">
+        <input id="login-confirm" name="password_confirm" type="password" placeholder="Re-enter password"
+          autocomplete="new-password">
+      </div>
+      <div class="input-group" id="pin-group" style="display: none;"> <input id="pin-code" type="text" name="pin"
+          placeholder="6-digit code" autocomplete="one-time-code" pattern="\d{6}" maxlength="6">
+      </div>
+
+      <label id="show-password-label" style="font-size:14px; margin-bottom:15px; display:flex; align-items:center;">
+        <input id="toggle-show-pwd" type="checkbox" style="margin-right:6px;">
+        Show password
+      </label>
+
+      <p id="login-error" style="color:red;   height:1.2em;"></p>
+      <p id="login-success" style="color:green; height:1.2em;"></p>
+      <button type="submit" class="login-btn" id="login-submit">Log in</button>
+
+      <div id="verify-actions" style="display: none; margin-top: 10px; font-size: 14px; text-align: center;">
+        <a href="#" id="resend-link" style="margin-right: 15px;">Resend Code</a>
+        <a href="#" id="cancel-link">Cancel Signup</a>
+      </div>
+
+      <p id="login-toggle" class="signup-link">Create an account</p>
+    </form>
+  </div>
+</div>
 
     <div class="controls">
       <button id="btn">🎤 Start Recording</button>
@@ -201,21 +212,32 @@
         window.updateGDriveButtonState();
       };
 
-      let isLoginMode = true; // Renamed from isLogin to avoid conflict
+      let authMode = "login"; // Possible values: "login", "signup", "verify"
+      let verificationEmail = ""; // Store email used for verification
+
+
       const modal = $("login-modal");
       const title = $("login-title");
       const form = $("login-form");
-      const fullnameInput = $("login-fullname");
-      const fullnameGrp = $("fullname-group");
       const email = $("login-email");
       const pwd = $("login-password");
       const confirmInput = $("login-confirm");
-      const confGrp = $("confirm-group");
-      const toggle = $("login-toggle");
-      const showPwd = $("toggle-show-pwd");
       const submitB = $("login-submit");
       const errMsg = $("login-error");
       const okMsg = $("login-success");
+
+      const fullnameInput = $("login-fullname");
+      const fullnameGrp = $("fullname-group");
+      const confGrp = $("confirm-group");
+      const toggle = $("login-toggle");
+      const showPwd = $("toggle-show-pwd");
+      const showPwdLabel = $("show-password-label"); // Get label
+      const passwordGroup = $("password-group"); // Get password group
+      const pinGroup = $("pin-group");           // Get new PIN group
+      const pinInput = $("pin-code");             // Get new PIN input
+      const verifyActions = $("verify-actions");    // Get verification actions div
+      const resendLink = $("resend-link");          // Get resend link
+      const cancelLink = $("cancel-link");          // Get cancel link
 
       // Navbar elements
       const authButton = $("auth-button");
@@ -258,6 +280,71 @@
       let currentUser = null;
       let lastQuota = null;
 
+      function updateModalUI(mode) {
+        authMode = mode; // Update global state
+
+        // Clear messages
+        errMsg.textContent = "";
+        okMsg.textContent = "";
+
+        // Reset common elements
+        email.readOnly = false;
+        fullnameGrp.style.display = "none";
+        passwordGroup.style.display = "none";
+        confGrp.style.display = "none";
+        pinGroup.style.display = "none"; // Hide PIN group by default
+        showPwdLabel.style.display = "none";
+        verifyActions.style.display = "none";
+        toggle.style.display = "block"; // Show by default
+
+        if (mode === "login") {
+          title.textContent = "Login";
+          email.parentElement.style.display = "block"; // Ensure email shown
+          passwordGroup.style.display = "block"; // Show Password
+          showPwdLabel.style.display = "flex";
+          submitB.textContent = "Log in";
+          toggle.textContent = "Create an account";
+          pwd.placeholder = "Password";
+          pwd.type = showPwd.checked ? "text" : "password";
+          pwd.autocomplete = "current-password";
+          pinInput.value = ""; // Clear PIN if switching back
+          pinInput.required = false;
+        } else if (mode === "signup") {
+          title.textContent = "Sign up";
+          fullnameGrp.style.display = "block"; // Show Full Name
+          email.parentElement.style.display = "block"; // Ensure email shown
+          passwordGroup.style.display = "block"; // Show Password
+          confGrp.style.display = "block";    // Show Confirm Password
+          showPwdLabel.style.display = "flex";
+          submitB.textContent = "Sign up";
+          toggle.textContent = "Already registered? Log in";
+          pwd.placeholder = "Enter a password";
+          pwd.type = showPwd.checked ? "text" : "password";
+          pwd.autocomplete = "new-password";
+          confirmInput.autocomplete = "new-password";
+          pinInput.value = ""; // Clear PIN
+          pinInput.required = false;
+        } else if (mode === "verify") {
+          title.textContent = "Verify E-mail";
+          okMsg.textContent = "Enter the 6-digit code we e-mailed you.";
+          email.parentElement.style.display = "block"; // Ensure email shown
+          email.readOnly = true; // Make email read-only
+          pinGroup.style.display = "block"; // Show PIN input group
+          passwordGroup.style.display = "none"; // Hide original password field
+          showPwdLabel.style.display = "none"; // Hide show password checkbox
+          toggle.style.display = "none"; // Hide mode toggle link
+          verifyActions.style.display = "block"; // Show Resend/Cancel links
+          submitB.textContent = "Verify";
+          pinInput.focus(); // Focus PIN input
+          pinInput.required = true;
+        }
+      }
+
+      updateModalUI("login");
+
+      toggle.addEventListener("click", () => updateModalUI(authMode === "login" ? "signup" : "login"));
+
+
       async function bootstrapAuth() {
         const res = await fetch("/me", { credentials: "include" });
         if (res.ok) {
@@ -271,17 +358,7 @@
           updateAuthUI();
         }
       }
-      if (currentUser && !data.email_verified) {
-        document.body.insertAdjacentHTML("afterbegin",
-          `<div class="banner">Verify your e‑mail
-        <button id="resend">Resend code</button></div>`);
-        $("#resend").onclick = () =>
-          fetch("/email/verify/send", {
-            method: "POST",
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: currentUser })
-          });
-      }
+
       window.addEventListener("DOMContentLoaded", bootstrapAuth);
 
       function openModal() {
@@ -293,115 +370,239 @@
         modal.style.display = "none";
       }
 
-      function switchAuthMode() {
-        isLoginMode = !isLoginMode;
-        title.textContent = isLoginMode ? "Login" : "Sign up";
-        submitB.textContent = isLoginMode ? "Log in" : "Sign up";
-        toggle.textContent = isLoginMode ? "Create an account" : "Already registered? Log in";
+      toggle.addEventListener("click", () => {
+        updateModalUI(authMode === "login" ? "signup" : "login");
+      });
 
-        confGrp.style.display = isLoginMode ? "none" : "block";
-        fullnameGrp.style.display = isLoginMode ? "none" : "block";
-        confirmInput.required = !isLoginMode;
-        fullnameInput.required = !isLoginMode;
-
-        pwd.placeholder = isLoginMode ? "Password" : "Enter a password";
-        confirmInput.value = fullnameInput.value = "";
-        errMsg.textContent = okMsg.textContent = "";
-      }
-
-      toggle.addEventListener("click", switchAuthMode);
       showPwd.addEventListener("change", () => {
         const t = showPwd.checked ? "text" : "password";
         pwd.type = confirmInput.type = t;
       });
 
-      form.addEventListener("submit", async e => {
+      function updateModalUI(mode) {
+        authMode = mode; // Update global state
+        console.log("Updating Modal UI to:", authMode); // Debug log
+
+        // Clear messages
+        errMsg.textContent = "";
+        okMsg.textContent = "";
+        // Clear inputs
+        fullnameInput.value = "";
+        // email.value = ""; // Keep email field populated when switching
+        pwd.value = "";
+        confirmInput.value = "";
+        pinInput.value = "";
+
+
+        // Reset common elements visibility/state
+        email.readOnly = false;
+        fullnameGrp.style.display = "none";
+        passwordGroup.style.display = "none";
+        confGrp.style.display = "none";
+        pinGroup.style.display = "none";
+        showPwdLabel.style.display = "none";
+        verifyActions.style.display = "none";
+        toggle.style.display = "block"; // Show toggle link by default
+        submitB.disabled = false; // Ensure button is enabled
+
+        // Configure based on mode
+        if (mode === "login") {
+          title.textContent = "Login";
+          email.parentElement.style.display = "block";
+          passwordGroup.style.display = "block";
+          showPwdLabel.style.display = "flex"; // Show the label containing checkbox
+          submitB.textContent = "Log in";
+          toggle.textContent = "Create an account";
+          pwd.placeholder = "Password";
+          pwd.type = showPwd.checked ? "text" : "password"; // Restore type based on checkbox
+          pwd.autocomplete = "current-password";
+          fullnameInput.required = false; // Not required for login
+          confirmInput.required = false;
+          pwd.required = true;
+        } else if (mode === "signup") {
+          title.textContent = "Sign up";
+          fullnameGrp.style.display = "block";
+          email.parentElement.style.display = "block";
+          passwordGroup.style.display = "block";
+          confGrp.style.display = "block";
+          showPwdLabel.style.display = "flex";
+          submitB.textContent = "Sign up";
+          toggle.textContent = "Already registered? Log in";
+          pwd.placeholder = "Enter a password";
+          pwd.type = showPwd.checked ? "text" : "password";
+          pwd.autocomplete = "new-password";
+          confirmInput.autocomplete = "new-password";
+          // Set required fields for signup
+          fullnameInput.required = true;
+          pwd.required = true;
+          confirmInput.required = true;
+        } else if (mode === "verify") {
+          title.textContent = "Verify E-mail";
+          okMsg.textContent = "Enter the 6-digit code we e-mailed you."; // Initial message
+          email.parentElement.style.display = "block";
+          email.readOnly = true; // Make email read-only
+          pinGroup.style.display = "block"; // Show PIN input ONLY
+          // Ensure others are hidden (redundant but safe)
+          fullnameGrp.style.display = "none";
+          passwordGroup.style.display = "none";
+          confGrp.style.display = "none";
+          showPwdLabel.style.display = "none";
+          toggle.style.display = "none"; // Hide mode toggle link
+          verifyActions.style.display = "block"; // Show Resend/Cancel
+          submitB.textContent = "Verify";
+          // Set required for PIN
+          pinInput.required = true;
+          fullnameInput.required = false;
+          pwd.required = false;
+          confirmInput.required = false;
+          pinInput.focus();
+        }
+      }
+
+      // --- NEW Combined Submit Handler ---
+      async function handleAuthSubmit(e) {
         e.preventDefault();
-        errMsg.textContent = okMsg.textContent = "";
+        errMsg.textContent = "";
+        okMsg.textContent = "";
+        const originalButtonText = submitB.textContent; // Store original text
+        submitB.disabled = true;
+        submitB.textContent = "Working...";
 
-        if (!isLoginMode && pwd.value !== confirmInput.value) {
-          errMsg.textContent = "Passwords do not match";
-          return;
-        }
-
-        const endpoint = isLoginMode ? "/token" : "/register";
-        const fd = new FormData();
-        fd.append("username", email.value);
-        fd.append("password", pwd.value);
-        if (!isLoginMode) {
-          fd.append("full_name", fullnameInput.value.trim());
-        }
         try {
-          const res = await fetch(endpoint, {
-            method: "POST",
-            body: fd,
-            credentials: "include"
-          });
-
-          if (!res.ok) {
-            const { detail = "Auth failed" } = await res.json();
-            throw new Error(detail);
-          }
-
-          if (isLoginMode) {
-            await bootstrapAuth();           // loads username via /me
+          if (authMode === "login") {
+            const fd = new FormData();
+            fd.append("username", email.value);
+            fd.append("password", pwd.value);
+            const res = await fetch("/token", { method: "POST", body: fd, credentials: "include" });
+            if (!res.ok) { const { detail = "Login failed" } = await res.json().catch(() => ({ detail: "Login failed" })); throw new Error(detail); }
+            await bootstrapAuth();
             okMsg.textContent = "Success! Loading…";
             setTimeout(() => { closeModal(); loadSession(); }, 500);
-          } else {
-            okMsg.textContent = "Enter the 6-digit code we e-mailed you.";
-            title.textContent = "Verify e-mail";
-            isLoginMode = true;               // reuse form as “verify”
-            email.readOnly = true;            // stop users changing it
 
-            fullnameGrp.style.display = "none";        // Hide Full Name group
-            confGrp.style.display = "none";          // Hide Confirm Password group
-            showPwd.parentElement.style.display = "none"; // Hide "Show password" label/checkbox
+          } else if (authMode === "signup") {
+            if (pwd.value !== confirmInput.value) { throw new Error("Passwords do not match"); }
+            const fd = new FormData();
+            fd.append("username", email.value);
+            fd.append("password", pwd.value);
+            fd.append("full_name", fullnameInput.value.trim());
+            const res = await fetch("/register", { method: "POST", body: fd, credentials: "include" });
+            if (!res.ok) { const { detail = "Registration failed" } = await res.json().catch(() => ({ detail: "Registration failed" })); throw new Error(detail); }
+            verificationEmail = email.value; // Store email
+            updateModalUI("verify"); // Switch UI state
 
-            pwd.type = "text";
-            pwd.placeholder = "6-digit code";
-            pwd.style.display = "block";
-            pwd.autocomplete = "one-time-code"
-            pwd.value = "";
-            pwd.focus(); // Focus the PIN input
-
-            toggle.style.display = "none";
-            submitB.textContent = "Verify";
-
-            // change submit handler (quick hack)
-            form.onsubmit = async ev => {
-              ev.preventDefault();
-              okMsg.textContent = ""; // Clear previous success message
-              errMsg.textContent = ""; // Clear previous error message
-              const pin = pwd.value.trim();            // we’ll reuse hidden pwd input
-              if (!pin || !/^\d{6}$/.test(pin)) { // Basic validation for 6 digits
-                errMsg.textContent = "Please enter the 6-digit code.";
-                return;
-              }
-              try {
-                const verifyRes = await fetch("/email/verify/check", { // Ensure correct endpoint
-                  method: "POST",
-                  // credentials: "include", // Include cookies if needed by this endpoint
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ email: email.value, pin: pin }) // Send email and PIN
-                });
-                if (verifyRes.ok) {
-                  okMsg.textContent = "✅ Verified - you can now log in";
-                  // Optionally log the user in directly or reload
-                  setTimeout(() => location.reload(), 1500);
-                } else {
-                  const errData = await verifyRes.json().catch(() => ({}));
-                  errMsg.textContent = errData.detail || "Wrong / expired code.";
-                }
-              } catch (verifyErr) {
-                console.error("Error during verification check:", verifyErr);
-                errMsg.textContent = "Verification request failed.";
-              }
-            };
+          } else if (authMode === "verify") {
+            const pin = pinInput.value.trim();
+            if (!pin || !/^\d{6}$/.test(pin)) { throw new Error("Please enter the 6-digit code."); }
+            const res = await fetch("/email/verify/check", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email: verificationEmail, pin: pin })
+            });
+            if (!res.ok) { const { detail = "Wrong / expired code." } = await res.json().catch(() => ({ detail: "Verification failed" })); throw new Error(detail); }
+            okMsg.textContent = "✅ Verified - you can now log in";
+            setTimeout(() => {
+              // Reset to login state after success message shows
+              email.readOnly = false;
+              verificationEmail = "";
+              updateModalUI("login");
+              // closeModal(); // Optionally close modal
+              // location.reload(); // Optionally reload page
+            }, 1500);
           }
         } catch (err) {
+          console.error(`Error during ${authMode}:`, err);
           errMsg.textContent = err.message;
+          // Restore button text based on the mode we were in *before* the error
+          submitB.textContent = originalButtonText; // Restore original text
+        } finally {
+          // Re-enable button only if verification isn't still pending or successful
+          if (!(authMode === 'verify' && okMsg.textContent.includes('Verified'))) {
+            submitB.disabled = false;
+            // Restore button text if not already done in catch block
+            if (!errMsg.textContent) submitB.textContent = originalButtonText;
+          }
         }
+      }
+
+      // --- NEW Event Handler Functions for Verification Actions ---
+      async function handleResendCode(e) {
+        e.preventDefault();
+        if (!verificationEmail) return;
+
+        errMsg.textContent = "";
+        okMsg.textContent = "Sending new code...";
+        resendLink.style.pointerEvents = "none";
+        resendLink.style.opacity = "0.5";
+
+        try {
+          const res = await fetch("/email/verify/send", {
+            method: "POST",
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: verificationEmail })
+          });
+          if (!res.ok) {
+            const { detail = "Failed to resend code." } = await res.json().catch(() => ({})); throw new Error(detail);
+          }
+          okMsg.textContent = "✅ New code sent! Check your e-mail.";
+          pinInput.value = ""; // Clear old pin
+          pinInput.focus();
+        } catch (err) {
+          errMsg.textContent = err.message;
+        } finally {
+          setTimeout(() => {
+            resendLink.style.pointerEvents = "auto";
+            resendLink.style.opacity = "1";
+          }, 5000); // Prevent spamming resend
+        }
+      }
+
+      async function handleCancelSignup(e) {
+        e.preventDefault();
+        if (!verificationEmail) return;
+
+        const userEmailToCancel = verificationEmail; // Capture before clearing
+        // Reset UI immediately back to default login state
+        verificationEmail = "";
+        email.value = ""; // Clear email field if desired, or keep it?
+        pwd.value = "";
+        pinInput.value = "";
+        email.readOnly = false;
+        updateModalUI("login");
+        okMsg.textContent = "Signup cancelled."; // Give feedback
+
+        // Optional: Call backend to delete unverified user/code in background
+        try {
+          await fetch("/email/verify/cancel", {
+            method: "POST",
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: userEmailToCancel }) // Use captured email
+          });
+          console.log("Backend cancellation requested for:", userEmailToCancel);
+        } catch (err) {
+          console.error("Failed to send cancel request to backend:", err);
+          // UI is already reset, maybe notify user backend cleanup might fail?
+        }
+      }
+
+
+      // --- Attach Event Listeners ---
+      form.addEventListener("submit", handleAuthSubmit); // Use the new handler
+      toggle.addEventListener("click", () => updateModalUI(authMode === "login" ? "signup" : "login")); // Use the new UI updater
+      showPwd.addEventListener("change", () => { // Keep this as is
+        const t = showPwd.checked ? "text" : "password";
+        pwd.type = confirmInput.type = t; // Affects both password fields if needed
       });
+      resendLink.addEventListener("click", handleResendCode); // Attach resend handler
+      cancelLink.addEventListener("click", handleCancelSignup); // Attach cancel handler
+
+
+      // --- Initial Setup ---
+      bootstrapAuth().then(fetchQuota); // Fetch user state on load
+      if (!currentUser) { // Check currentUser *after* bootstrapAuth potentially sets it
+        openModal();
+      }
+      updateModalUI(authMode); // Set initial UI state based on default authMode ('login')
+      
 
       async function fetchQuota() {
         const res = await fetch("/me/quota", { credentials: "include" });
@@ -419,8 +620,6 @@
             el.classList.add("hidden");
           }
         }
-
-      bootstrapAuth().then(fetchQuota);
 
       // --- Add Event Listeners for Modal Close Buttons ---
       const closeLoginBtn = $("close-login-modal");

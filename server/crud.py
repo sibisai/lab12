@@ -154,36 +154,68 @@ async def seed_roles(db: AsyncSession) -> None:
 
 # --- Email verification ----------------------------------------------------
 
-async def create_verification_code(db: AsyncSession, email: str, user_id: int) -> str:
-    code = f"{secrets.randbelow(900000):06d}"
+# server/crud.py
+
+async def create_verification_code(
+    db: AsyncSession,
+    email: str,
+    user_id: int,
+    *,
+    ttl_minutes: int = 1440,
+) -> str:
+    # 1) Expire any previous codes
+    await db.execute(
+        sa.update(EmailVerification)
+        .where(
+            EmailVerification.user_id == user_id,
+            EmailVerification.consumed.is_(False),
+            EmailVerification.expires_at > datetime.datetime.utcnow()
+        )
+        .values(expires_at=datetime.datetime.utcnow())
+    )
+
+    # 2) Insert a new code
+    code = f"{secrets.randbelow(900_000):06d}"
     ev = EmailVerification(
-        email=email,
         user_id=user_id,
+        email=email,
         code=code,
-        expires_at=datetime.datetime.utcnow() + datetime.timedelta(days=1)
+        expires_at=datetime.datetime.utcnow() + datetime.timedelta(minutes=ttl_minutes)
     )
     db.add(ev)
     await db.commit()
     return code
 
-async def confirm_code(db, email, code) -> bool:
+async def confirm_code(
+    db: AsyncSession,
+    email: str,
+    code: str,
+) -> bool:
+    now = datetime.datetime.utcnow()
     row = (
         await db.execute(
             select(EmailVerification)
-            .where(EmailVerification.email == email,
-                   EmailVerification.code == code,
-                   EmailVerification.consumed.is_(False),
-                   EmailVerification.expires_at > datetime.datetime.utcnow())
-            .with_for_update()                 # lock the row
+            .where(
+                EmailVerification.email == email,
+                EmailVerification.code == code,
+                EmailVerification.consumed.is_(False),
+                EmailVerification.expires_at > now
+            )
+            .with_for_update()
         )
     ).scalar_one_or_none()
 
     if not row:
         return False
 
+    # mark this code consumed
     row.consumed = True
+
+    # mark the user verified
     await db.execute(
-        sa.update(User).where(User.username == email).values(email_verified=True)
+        sa.update(User)
+        .where(User.id == row.user_id)
+        .values(email_verified=True)
     )
     await db.commit()
     return True
