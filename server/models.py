@@ -133,3 +133,34 @@ Index("ix_email_unexpired",
       EmailVerification.email,
       EmailVerification.consumed,
       EmailVerification.expires_at)
+
+
+class PasswordReset(Base):
+    __tablename__ = "password_resets"
+
+    id         = Column(Integer, primary_key=True)
+    user_id    = Column(Integer, ForeignKey("users.id"), nullable=False)
+    email      = Column(String, nullable=False, index=True)
+    code       = Column(String(6), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    consumed   = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User", back_populates="password_resets")
+
+# back‑populate in User:
+User.password_resets = relationship(
+    "PasswordReset",
+    back_populates="user",
+    cascade="all, delete-orphan"
+)
+
+Index(
+    "ix_password_reset_unexpired",
+    PasswordReset.email,
+    PasswordReset.consumed,
+    PasswordReset.expires_at
+)
+
+
+

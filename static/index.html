@@ -128,6 +128,9 @@
       <p id="login-error" style="color:red;   height:1.2em;"></p>
       <p id="login-success" style="color:green; height:1.2em;"></p>
       <button type="submit" class="login-btn" id="login-submit">Log in</button>
+      <p class="small">
+        <a href="#" id="forgot-link">Forgot password?</a>
+      </p>
 
       <div id="verify-actions" class="verify-actions"style="display: none; margin-top: 10px; font-size: 14px; text-align: center;">
         <a href="#" id="resend-link" style="margin-right: 15px;">Resend Code</a>
@@ -216,6 +219,8 @@
 
       let authMode = "login"; // Possible values: "login", "signup", "verify"
       let verificationEmail = ""; // Store email used for verification
+      const RESET_REQ = "reset-request";
+      const RESET_VERIFY = "reset-verify";
 
 
       const modal = $("login-modal");
@@ -285,7 +290,12 @@
       updateModalUI("login");
 
       toggle.addEventListener("click", () => updateModalUI(authMode === "login" ? "signup" : "login"));
-
+      
+      const forgotLink = $("forgot-link");
+      forgotLink.addEventListener("click", e => {
+        e.preventDefault();
+        updateModalUI(RESET_REQ);
+      });
 
       async function bootstrapAuth() {
         const res = await fetch("/me", { credentials: "include" });
@@ -400,6 +410,53 @@
           pwd.required = false;
           confirmInput.required = false;
           pinInput.focus();
+          } else if (mode === RESET_REQ) {
+          title.textContent = "Reset password";
+
+          // Show only email
+          email.parentElement.style.display = "block";
+          passwordGroup.style.display = "none";
+          confGrp.style.display = "none";
+          pinGroup.style.display = "none";
+          showPwdLabel.style.display = "none";
+          verifyActions.style.display = "none";
+          toggle.style.display = "none";
+
+          // Button text
+          submitB.textContent = "Send code";
+
+          // Validation
+          email.required = true;
+
+          // Turn off any leftover required constraints
+          pwd.required = false;
+          pwd.disabled = true;
+          confirmInput.required = false;
+          confirmInput.disabled = true;
+          pinInput.required = false;
+          pinInput.disabled = true;
+        } else if (mode === RESET_VERIFY) {
+          title.textContent = "Enter reset code";
+
+          email.parentElement.style.display = "block";
+          pinGroup.style.display = "block";
+          passwordGroup.style.display = "block";
+          confGrp.style.display = "block";
+
+          // Validation
+          pinInput.required = true;
+          pwd.required = true;
+          confirmInput.required = true;
+
+          // Make sure they’re enabled
+          pwd.disabled = false;
+          confirmInput.disabled = false;
+          pinInput.disabled = false;
+
+          showPwdLabel.style.display = "none";
+          verifyActions.style.display = "none";
+          toggle.style.display = "none";
+          submitB.textContent = "Reset";
         }
       }
 
@@ -413,6 +470,39 @@
         submitB.textContent = "Working...";
 
         try {
+          if (authMode === RESET_REQ) {
+            const res = await fetch("/auth/password-reset/request", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email: email.value })
+            });
+            okMsg.textContent = "If that email exists, code was sent";
+            // switch to verify step after a moment
+            setTimeout(() => updateModalUI(RESET_VERIFY), 800);
+            return;
+          }
+
+          if (authMode === RESET_VERIFY) {
+            // validate new pw/confirm match
+            if (pwd.value !== confirmInput.value) throw new Error("Passwords don't match");
+            const res = await fetch("/auth/password-reset/verify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                email: email.value,
+                code: pinInput.value,
+                new_password: pwd.value
+              })
+            });
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({ detail: "Reset failed" }));
+              throw new Error(err.detail);
+            }
+            okMsg.textContent = "✅ Done – please log in";
+            // back to login
+            setTimeout(() => updateModalUI("login"), 1200);
+            return;
+          }
           if (authMode === "login") {
 
             const fd = new FormData();
@@ -439,6 +529,7 @@
               const { detail = "Login failed" } = await res.json().catch(() => ({ detail: "Login failed" })); 
               throw new Error(detail); 
             }
+
 
             // 200: fully authenticated
             await bootstrapAuth();

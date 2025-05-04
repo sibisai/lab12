@@ -79,7 +79,7 @@ async def send_verification_email(recipient: str, code: str, public_base_url: st
 .btn{{display:block;width:200px;margin:18px auto;text-align:center;background:#1a73e8;color:#fff;
       text-decoration:none;padding:12px 0;border-radius:4px}}</style></head><body>
 <div class="container">
-  <h1 style="text-align:center;margin:0 0 18px">Verify e‑mail</h1>
+  <h1 style="text-align:center;margin:0 0 18px">Verify email</h1>
   <p style="text-align:center">Use this 6‑digit code:</p>
   <div class="code">{code}</div>
   <p style="text-align:center;font-size:13px;color:#d40000">Expires {expires}. After that you’ll need a new code.</p></div></body></html>"""
@@ -91,3 +91,81 @@ async def send_feedback_alert(feedback: str, user_email: str) -> None:
     plain   = feedback
     html    = f"<p><strong>From</strong>: {bleach.clean(user_email)}</p><pre>{bleach.clean(feedback)}</pre>"
     await _deliver(_build(ADMIN_EMAIL, subject, plain, html))
+
+async def send_password_reset_email(recipient: str, code: str) -> None:
+    # Debug: function entry
+    print(f"[INFO] send_password_reset_email() called for {recipient}, code={code}")
+
+    # Build the same “public_base_url” if you ever want a deep‑link button:
+    # link = f"{PUBLIC_BASE_URL}/reset?code={code}&email={recipient}"
+
+    # Compute a human‑readable expiry
+    expires = (datetime.utcnow() + timedelta(hours=1)).strftime("%B %d, %Y at %I:%M %p UTC")
+    # print(f"[DEBUG] reset code will expire at {expires}")
+
+    subject = "Your Lab12 password‑reset code"
+
+    # Plain‑text fallback
+    plain = (
+        f"Your Lab12 password‑reset code is {code}.\n"
+        f"It expires at {expires}.\n"
+        # f"Or click this link to reset now: {link}"
+    )
+
+    # HTML version, re‑using your verification styles
+    html = f"""\
+      <!doctype html>
+      <html><head><meta charset="utf-8">
+        <style>
+          body {{ font-family: Helvetica, Arial, sans-serif; }}
+          .container {{
+            border: 1px solid #ccc;
+            padding: 20px;
+            border-radius: 6px;
+            max-width: 500px;
+            margin: auto;
+          }}
+          .code {{
+            font-size: 32px;
+            text-align: center;
+            margin: 18px 0;
+            font-weight: bold;
+          }}
+          .expires {{
+            text-align: center;
+            font-size: 13px;
+            color: #d40000;
+          }}
+          .btn {{
+            display: block;
+            width: 200px;
+            margin: 18px auto;
+            text-align: center;
+            background: #1a73e8;
+            color: #fff;
+            text-decoration: none;
+            padding: 12px 0;
+            border-radius: 4px;
+            font-weight: bold;
+          }}
+        </style>
+      </head><body>
+        <div class="container">
+          <h1 style="text-align:center; margin:0 0 18px;">Reset your password</h1>
+          <p style="text-align:center;">Use this 6‑digit code:</p>
+          <div class="code">{code}</div>
+          <p class="expires">Expires {expires}</p>
+
+      </body></html>
+      """
+  
+    # Debug: payload sizes
+    # print(f"[DEBUG] HTML payload length: {len(html)} chars")
+
+    # Send it
+    try:
+        await _deliver(_build(recipient, subject, plain, html))
+        print(f"[INFO] Password‑reset email delivered to {recipient}")
+    except Exception as e:
+        print(f"[ERROR] Failed to deliver password‑reset email to {recipient}: {e}")
+        raise

@@ -59,7 +59,7 @@ rm vosk-model-en-us-0.22.zip
 #    Make sure to fill in your DATABASE_URL, OPENAI_API_KEY, Google keys etc.
 
 # 6. Run the server (ensure PostgreSQL is running)
-python -m server.uvicorn main:app
+python -m uvicorn server.main:app
 
 # 7. Open the application in your browser
 # Then visit http://127.0.0.1:8000/

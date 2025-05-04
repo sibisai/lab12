@@ -5,7 +5,6 @@ Asynchronous helper functions for DB access.
 
 import datetime, secrets
 from typing import Optional, Sequence
-from server.models import EmailVerification, User
 import sqlalchemy as sa
 from sqlalchemy import select, update, insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +18,8 @@ from server.models import (
     SubscriptionPlan,
     UserSubscriptionHistory,
     Role,
+    EmailVerification,
+    PasswordReset
 )
 
 # ── Password hashing ────────────────────────────────────────────────────────
@@ -219,3 +220,69 @@ async def confirm_code(
     )
     await db.commit()
     return True
+
+
+async def create_password_reset_code(
+    db: AsyncSession,
+    email: str,
+    user_id: int,
+    *,
+    ttl_minutes: int = 60
+) -> str:
+    # expire any previous
+    await db.execute(
+      sa.update(PasswordReset)
+        .where(
+          PasswordReset.user_id==user_id,
+          PasswordReset.consumed.is_(False),
+          PasswordReset.expires_at > datetime.datetime.utcnow()
+        )
+        .values(expires_at=datetime.datetime.utcnow())
+    )
+
+    code = f"{secrets.randbelow(900_000):06d}"
+    pr = PasswordReset(
+      user_id=user_id,
+      email=email,
+      code=code,
+      expires_at=datetime.datetime.utcnow() +
+                 datetime.timedelta(minutes=ttl_minutes),
+    )
+    db.add(pr)
+    await db.commit()
+    return code
+
+async def confirm_password_reset_code(
+    db: AsyncSession,
+    email: str,
+    code: str
+) -> Optional[int]:
+    """Returns user_id if OK, else None."""
+    now = datetime.datetime.utcnow()
+    row = (await db.execute(
+      select(PasswordReset)
+        .where(
+          PasswordReset.email==email,
+          PasswordReset.code==code,
+          PasswordReset.consumed.is_(False),
+          PasswordReset.expires_at>now
+        )
+        .with_for_update()
+    )).scalar_one_or_none()
+    if not row:
+        return None
+
+    row.consumed = True
+    await db.commit()
+    return row.user_id
+
+async def update_user_password(db: AsyncSession, user_id: int, new_password: str):
+    hashed = _pwd_ctx.hash(new_password)
+    await db.execute(
+      sa.update(User)
+        .where(User.id==user_id)
+        .values(hashed_password=hashed)
+    )
+    await db.commit()
+
+    

@@ -32,7 +32,15 @@ from server.db import engine, get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import delete
 from server import crud, mailer
-from server.crud import get_user_by_username, DEFAULT_PLANS
+from server.crud import (
+    get_user_by_username, 
+    DEFAULT_PLANS,   
+    get_user_by_username,
+    create_password_reset_code,
+    confirm_password_reset_code,
+    update_user_password
+)
+import server.mailer as mailer
 from sqlalchemy import insert
 from server.models import User, UserToken, EmailVerification, UserSubscriptionHistory, user_roles
 # Google API Imports
@@ -636,6 +644,30 @@ async def check_pin(r: PinReq, db=Depends(get_db)):
     if not await crud.confirm_code(db, r.email, r.pin):
         raise HTTPException(400, "Invalid or expired code")
     return {"detail": "verified"}
+
+class ResetConfirmReq(BaseModel):
+    email: str
+    code: str
+    new_password: str
+
+@app.post("/auth/password-reset/request", status_code=202)
+async def password_reset_request(r: EmailReq, db: AsyncSession = Depends(get_db)):
+    user = await get_user_by_username(db, r.email)
+    if user:
+        code = await create_password_reset_code(db, r.email, user.id)
+        await mailer.send_password_reset_email(r.email, code)
+
+    # always succeed
+    return {"detail":"If that email exists, a code has been sent."}
+
+@app.post("/auth/password-reset/verify", status_code=200)
+async def password_reset_verify(r: ResetConfirmReq, db: AsyncSession = Depends(get_db)):
+    uid = await confirm_password_reset_code(db, r.email, r.code)
+    if not uid:
+        raise HTTPException(400, "Invalid or expired code")
+    await update_user_password(db, uid, r.new_password)
+    return {"detail":"Password has been reset."}
+
 
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
