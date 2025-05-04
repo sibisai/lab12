@@ -90,6 +90,15 @@ body {
 
 .signup-link {
   margin-top: 12px;
+  font-size: 16px;
+  color: var(--dark);
+  cursor: pointer;
+}
+
+.forgot-container a {
+  display: inline-block;
+  margin: 0 8px;
+  margin-top: 12px;
   font-size: 14px;
   color: var(--dark);
   cursor: pointer;
@@ -99,7 +108,7 @@ body {
   display: inline-block;
   margin: 0 8px;
   margin-top: 12px;
-  font-size: 14px;
+  font-size: 16px;
   color: var(--dark);
   cursor: pointer;
 }

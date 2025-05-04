@@ -128,7 +128,7 @@
       <p id="login-error" style="color:red;   height:1.2em;"></p>
       <p id="login-success" style="color:green; height:1.2em;"></p>
       <button type="submit" class="login-btn" id="login-submit">Log in</button>
-      <p class="small">
+      <p class="forgot-container">
         <a href="#" id="forgot-link">Forgot password?</a>
       </p>
 
@@ -356,6 +356,9 @@
         verifyActions.style.display = "none";
         toggle.style.display = "block"; // Show toggle link by default
         submitB.disabled = false; // Ensure button is enabled
+
+        const forgotContainer = document.querySelector('.forgot-container');
+        forgotContainer.style.display = (mode === 'login' ? 'block' : 'none');
 
         // Configure based on mode
         if (mode === "login") {
