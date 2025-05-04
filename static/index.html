@@ -74,7 +74,9 @@
 
     <!-- ––––– Google JS API loader (for Picker) –––––            -->
     <script src="https://apis.google.com/js/api.js?onload=onGoogleApiLoad"  defer></script>
+
     <link rel="stylesheet" href="styles.css">
+    
 </head>
 
 <body>
@@ -127,9 +129,9 @@
       <p id="login-success" style="color:green; height:1.2em;"></p>
       <button type="submit" class="login-btn" id="login-submit">Log in</button>
 
-      <div id="verify-actions" style="display: none; margin-top: 10px; font-size: 14px; text-align: center;">
+      <div id="verify-actions" class="verify-actions"style="display: none; margin-top: 10px; font-size: 14px; text-align: center;">
         <a href="#" id="resend-link" style="margin-right: 15px;">Resend Code</a>
-        <a href="#" id="cancel-link">Cancel Signup</a>
+        <a href="#" id="cancel-link">Change Email</a>
       </div>
 
       <p id="login-toggle" class="signup-link">Create an account</p>
@@ -379,8 +381,9 @@
           confirmInput.required = true;
           pinInput.required = false;
         } else if (mode === "verify") {
-          title.textContent = "Verify E-mail";
+          title.textContent = "Verify Email";
           okMsg.textContent = "Enter the 6‑digit code."; // Initial message
+          submitB.textContent = "Verify";
           email.parentElement.style.display = "block";
           email.readOnly = true; // Make email read-only
           pinGroup.style.display = "block"; // Show PIN input ONLY
@@ -391,7 +394,6 @@
           showPwdLabel.style.display = "none";
           toggle.style.display = "none"; // Hide mode toggle link
           verifyActions.style.display = "block"; // Show Resend/Cancel
-          submitB.textContent = "Verify";
           // Set required for PIN
           pinInput.required = true;
           fullnameInput.required = false;
@@ -412,11 +414,33 @@
 
         try {
           if (authMode === "login") {
+
             const fd = new FormData();
             fd.append("username", email.value);
             fd.append("password", pwd.value);
-            const res = await fetch("/token", { method: "POST", body: fd, credentials: "include" });
-            if (!res.ok) { const { detail = "Login failed" } = await res.json().catch(() => ({ detail: "Login failed" })); throw new Error(detail); }
+
+            const res = await fetch("/token", { 
+              method: "POST", 
+              body: fd, 
+              credentials: "include" 
+            });
+
+            if (res.status === 403) {
+              // un‑verified user: switch to the verify UI
+              verificationEmail = email.value;      // remember which email
+              updateModalUI("verify");             // show the PIN input
+              okMsg.textContent = "Check your inbox for the code.";
+              // submitB.disabled = false;
+              // submitB.textContent = "Verify";
+              return;
+            }
+
+            if (!res.ok) { 
+              const { detail = "Login failed" } = await res.json().catch(() => ({ detail: "Login failed" })); 
+              throw new Error(detail); 
+            }
+
+            // 200: fully authenticated
             await bootstrapAuth();
             okMsg.textContent = "Success! Loading…";
             setTimeout(() => { closeModal(); loadSession(); }, 500);
@@ -485,7 +509,7 @@
           if (!res.ok) {
             const { detail = "Failed to resend code." } = await res.json().catch(() => ({})); throw new Error(detail);
           }
-          okMsg.textContent = "✅ New code sent! Check your e-mail.";
+          okMsg.textContent = "✅ New code sent";
           pinInput.value = ""; // Clear old pin
           pinInput.focus();
         } catch (err) {
@@ -506,11 +530,11 @@
         // Reset UI immediately back to default login state
         verificationEmail = "";
         email.value = ""; // Clear email field if desired, or keep it?
-        pwd.value = "";
+        // pwd.value = "";
         pinInput.value = "";
         email.readOnly = false;
-        updateModalUI("login");
-        okMsg.textContent = "Signup cancelled."; // Give feedback
+        updateModalUI("signup");
+        okMsg.textContent = "Email cleared"; // Give feedback
 
         // Optional: Call backend to delete unverified user/code in background
         try {

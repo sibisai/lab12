@@ -216,7 +216,7 @@ async def register(                                             # ← rewritten
     logger.info(f"Registration attempt for username: {username}")
     # 1) ensure unique
     if await crud.get_user_by_username(db, username):
-        raise HTTPException(status_code=400, detail="Username already taken")
+        raise HTTPException(status_code=400, detail="This email is already in use.")
 
     # 2) create the user (unverified)
     user = await crud.create_user(db, username, password, full_name)
@@ -247,7 +247,7 @@ async def login_for_access_token(
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
     if not user.email_verified:
-        raise HTTPException(403, "Please verify your e‑mail first")
+        raise HTTPException(status_code=403, detail="Please verify your e‑mail first")
     
     secure_cookie = not os.getenv("DEV_INSECURE")
     access_token = create_access_token({"sub": user.username})
