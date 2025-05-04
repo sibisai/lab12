@@ -6,7 +6,8 @@ from typing import Annotated
 
 from fastapi             import Depends, HTTPException, status, Cookie
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from server.models import Role, user_roles
+from sqlalchemy import select
 from .db    import get_db
 from .crud  import get_user_by_username, DEFAULT_PLANS
 
@@ -41,15 +42,23 @@ _FREE_PLAN = _PLAN_MAP["free"]
 
 async def enforce_quota(
     current_user: Annotated[str, Depends(_current_user_from_cookie)],
-    db:           AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
-    """
-    1. Look up the user row.
-    2. If their monthly quota is exhausted → raise **402 Payment Required**.
-    3. Return the `User` ORM object so the calling route can reuse it.
-    """
+    # 1) look up the User ORM
     user = await get_user_by_username(db, current_user)
 
+    # 2) check if they have the “admin” role
+    row = await db.execute(
+        select(Role.name)
+        .select_from(Role)
+        .join(user_roles, user_roles.c.role_id == Role.id)
+        .where(user_roles.c.user_id == user.id)
+    )
+    roles = {r[0] for r in row.all()}
+    if "admin" in roles:
+        return user  # admins are unlimited
+
+    # 3) otherwise, enforce the normal plan/quota
     plan = _PLAN_MAP.get(user.subscription_plan, _FREE_PLAN)
     if user.summarize_call_count >= plan["quota"]:
         raise HTTPException(

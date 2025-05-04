@@ -697,14 +697,24 @@
         }
       }
       function paintQuota() {
-          const el = $("quota-info");
-          if (currentUser && lastQuota) {
-            el.textContent = `Credits: ${lastQuota.remaining} / ${lastQuota.plan.quota}`;
-            el.classList.remove("hidden");
-          } else {
-            el.classList.add("hidden");
-          }
+        const el = document.getElementById("quota-info");
+        if (!currentUser || !lastQuota) {
+          el.classList.add("hidden");
+          return;
         }
+
+        let text;
+        if (lastQuota.remaining === "∞" || lastQuota.plan.name === "admin") {
+          text = "Credits: Unlimited";
+        } else {
+          // clamp to zero so you never see negative
+          const rem = Math.max(0, lastQuota.remaining);
+          text = `Credits: ${rem} / ${lastQuota.plan.quota}`;
+        }
+
+        el.textContent = text;
+        el.classList.remove("hidden");
+      }
 
       // --- Add Event Listeners for Modal Close Buttons ---
       const closeLoginBtn = $("close-login-modal");

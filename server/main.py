@@ -30,10 +30,9 @@ from slowapi.middleware import SlowAPIMiddleware
 from contextlib import asynccontextmanager
 from server.db import engine, get_db
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import delete
+from sqlalchemy import delete, select, func
 from server import crud, mailer
 from server.crud import (
-    get_user_by_username, 
     DEFAULT_PLANS,   
     get_user_by_username,
     create_password_reset_code,
@@ -42,7 +41,7 @@ from server.crud import (
 )
 import server.mailer as mailer
 from sqlalchemy import insert
-from server.models import User, UserToken, EmailVerification, UserSubscriptionHistory, user_roles
+from server.models import Role, User, UserToken, EmailVerification, UserSubscriptionHistory, user_roles
 # Google API Imports
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
@@ -314,10 +313,24 @@ async def quota_api(
     db: AsyncSession  = Depends(get_db)
 ):
     u = await crud.get_user_by_username(db, current_user)
+    if not u:
+        raise HTTPException(404, "User not found")
+
+    # did they have an admin row?
+    admin_q = (
+      select(func.count())
+      .select_from(user_roles.join(Role))
+      .where(user_roles.c.user_id == u.id, Role.name == "admin")
+    )
+    admin_count = (await db.execute(admin_q)).scalar_one()
+    if admin_count:
+        return { "remaining": "∞",
+            "plan": {"name": "admin", "quota": "∞"}}
+
     plan = PLAN_MAP.get(u.subscription_plan, FREE_PLAN)
     return {
-        "remaining": plan["quota"] - u.summarize_call_count,
-        "plan": plan
+      "remaining": plan["quota"] - u.summarize_call_count,
+      "plan": plan
     }
 
 # ── WebSocket: streaming STT (Protected) ───────────────────────────────────
