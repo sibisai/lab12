@@ -29,6 +29,10 @@ COPY --from=builder /app/static     /app/static
 COPY models/vosk-model-en-us-0.22 /app/models/vosk-model-en-us-0.22
 
 ENV PATH=/root/.local/bin:$PATH
+# **POINT urllib at Certifi’s CA bundle**
+# adjust the path if your python version is different
+ENV PATH=/root/.local/bin:$PATH \
+  SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 
 EXPOSE 8000
 CMD ["uvicorn", "server.main:app", "--host", "0.0.0.0", "--port", "8000"]

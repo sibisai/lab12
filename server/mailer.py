@@ -1,171 +1,140 @@
-"""
-Reusable async helpers for Lab12 e‑mail.
+# mailer.py — Reusable async helpers for Lab12 e‑mail, now using SendGrid Web API
 
-send_verification_email()  – 6‑digit PIN, HTML+plain, deep‑link button  
-send_feedback_alert()      – sends moderators a copy of user feedback
-"""
-import os, ssl, smtplib, certifi, secrets, asyncio
-from email.message import EmailMessage
-from datetime import datetime, timedelta
-from pathlib import Path
-from dotenv import load_dotenv, find_dotenv
-import bleach
+import os
+import asyncio
 import traceback
+from datetime import datetime, timedelta
+
+import bleach
+from dotenv import load_dotenv, find_dotenv
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
 
 # ── env ────────────────────────────────────────────────────────────────────
 load_dotenv(find_dotenv(), override=True)
 
-EMAIL_SENDER   = os.getenv("EMAIL_SENDER")      # e.g. lab12bot@gmail.com
-EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")    # 16‑char Google App‑Password
-ADMIN_EMAIL    = os.getenv("ADMIN_EMAIL", EMAIL_SENDER)
-EMAIL_SMTP     = "smtp.gmail.com"
-EMAIL_PORT     = 465
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
+EMAIL_SENDER     = os.getenv("EMAIL_SENDER")      # e.g. no‑reply@yourdomain.com
+ADMIN_EMAIL      = os.getenv("ADMIN_EMAIL", EMAIL_SENDER)
 
-if not (EMAIL_SENDER and EMAIL_PASSWORD):
-    raise RuntimeError("Add EMAIL_SENDER & EMAIL_PASSWORD to your .env")
+if not (SENDGRID_API_KEY and EMAIL_SENDER):
+    raise RuntimeError("Add SENDGRID_API_KEY & EMAIL_SENDER to your .env")
 
-# ── tiny helpers ───────────────────────────────────────────────────────────
-def _build(msg_to: str, subject: str, plain: str, html: str | None = None) -> EmailMessage:
-    m              = EmailMessage()
-    m["From"]      = EMAIL_SENDER
-    m["To"]        = msg_to
-    m["Subject"]   = subject
-    m["Reply-To"] = EMAIL_SENDER
-    m["List-Unsubscribe"] = "<mailto:{}?subject=unsubscribe>".format(EMAIL_SENDER)
-    m["X-Mailing-Server"] = "Lab12 Mailer"
-    m.set_content(plain)
-    if html:
-        m.add_alternative(html, subtype="html")
-    return m
+# ── internal send helper ────────────────────────────────────────────────────
+async def _send_via_sendgrid(to_email: str, subject: str, plain: str, html: str | None = None) -> None:
+    """
+    Fire off a SendGrid Mail object.  Uses asyncio to keep the API call non‑blocking.
+    """
+    message = Mail(
+        from_email=EMAIL_SENDER,
+        to_emails=to_email,
+        subject=subject,
+        plain_text_content=plain,
+        html_content=html or plain,
+    )
 
-async def _deliver(msg: EmailMessage) -> None:
-    print('delivering...')
-    ctx = ssl.create_default_context(cafile=certifi.where())
     loop = asyncio.get_running_loop()
-
-    # put *all* the blocking SMTP work inside this helper
-    def _blocking():
+    def _blocking_send():
         try:
-            with smtplib.SMTP_SSL(EMAIL_SMTP, EMAIL_PORT, context=ctx) as s:
-                # s.set_debuglevel(1)            # SMTP protocol debug
-                s.login(EMAIL_SENDER, EMAIL_PASSWORD)
-                s.send_message(msg)
-            print("✅ [blocking] Email sent successfully")
+            sg = SendGridAPIClient(SENDGRID_API_KEY)
+            response = sg.send(message)
+            print(f"✅ [SendGrid] {to_email!r} → {subject!r}: {response.status_code}")
         except Exception:
-            print("❌ [blocking] Failed to send email:")
+            print(f"❌ [SendGrid] Failed to send to {to_email!r} / {subject!r}")
             traceback.print_exc()
             raise
 
-    # now offload it to a thread
-    try:
-        await loop.run_in_executor(None, _blocking)
-        print("✅ Email sent successfully (async)")
-    except Exception as e:
-        print(f"❌ Failed in run_in_executor: {e}")
-        traceback.print_exc()
-        raise
+    await loop.run_in_executor(None, _blocking_send)
+
 # ── public API ─────────────────────────────────────────────────────────────
 async def send_verification_email(recipient: str, code: str, public_base_url: str) -> None:
-    print(f"Entered send_verification_email for recipient: {recipient} with code: {code}") # <-- LOG POINT A (Function Entry)
-    link      = f"{public_base_url}/verify?pin={code}&email={recipient}"
-    expires   = (datetime.utcnow() + timedelta(days=1)).strftime("%B %d %Y")
-    subject   = "Verify your Lab12 e‑mail"
-    plain     = f"Your verification code is {code} (expires {expires}).\nOr open {link}"
-    html      = f"""\
-<!doctype html><html><head><meta charset="utf-8">
-<style>body{{font-family:Helvetica,Arial,sans-serif}}
-.container{{border:1px solid #ccc;padding:20px;border-radius:6px;max-width:500px;margin:auto}}
-.code{{font-size:32px;text-align:center;margin:18px 0}}
-.btn{{display:block;width:200px;margin:18px auto;text-align:center;background:#1a73e8;color:#fff;
-      text-decoration:none;padding:12px 0;border-radius:4px}}</style></head><body>
-<div class="container">
-  <h1 style="text-align:center;margin:0 0 18px">Verify email</h1>
-  <p style="text-align:center">Use this 6‑digit code:</p>
-  <div class="code">{code}</div>
-  <p style="text-align:center;font-size:13px;color:#d40000">Expires {expires}. After that you’ll need a new code.</p></div></body></html>"""
+    """
+    Send a 6‑digit PIN with deep‑link verification button.
+    """
+    print(f"[INFO] send_verification_email for {recipient!r} code={code}")
+    expires_date = (datetime.utcnow() + timedelta(days=1)).strftime("%B %d %Y")
+    link         = f"{public_base_url}/verify?pin={code}&email={recipient}"
 
-    await _deliver(_build(recipient, subject, plain, html))
+    subject = "Verify your Lab12 e‑mail"
+    plain   = (
+        f"Your verification code is {code} (expires {expires_date}).\n"
+        f"Or click: {link}"
+    )
+    html    = f"""\
+<!doctype html>
+<html><head><meta charset="utf-8">
+  <style>
+    body {{ font-family: Helvetica, Arial, sans-serif; }}
+    .container {{ border: 1px solid #ccc; padding:20px; border-radius:6px; max-width:500px; margin:auto }}
+    .code {{ font-size:32px; text-align:center; margin:18px 0 }}
+
+    .expires {{ text-align:center; font-size:13px; color:#d40000 }}
+  </style>
+</head><body>
+  <div class="container">
+    <h1 style="text-align:center; margin:0 0 18px">Verify email</h1>
+    <p style="text-align:center">Use this 6‑digit code:</p>
+    <div class="code">{code}</div>
+    <p class="expires">Expires {expires_date}</p>
+    
+  </div>
+</body></html>"""
+
+    await _send_via_sendgrid(recipient, subject, plain, html)
+
+"""
+    .btn {{
+      display:block; width:200px; margin:18px auto;
+      text-align:center; background:#1a73e8; color:#fff;
+      text-decoration:none; padding:12px 0; border-radius:4px
+    }}
+ <a class="btn" href="{link}">Verify now</a>
+"""
 
 async def send_feedback_alert(feedback: str, user_email: str) -> None:
+    """
+    Send moderators a copy of user feedback.
+    """
+    print(f"[INFO] send_feedback_alert from {user_email!r}")
     subject = f"New Lab12 feedback from {user_email}"
-    plain   = feedback
-    html    = f"<p><strong>From</strong>: {bleach.clean(user_email)}</p><pre>{bleach.clean(feedback)}</pre>"
-    await _deliver(_build(ADMIN_EMAIL, subject, plain, html))
+    clean_user = bleach.clean(user_email)
+    clean_fb   = bleach.clean(feedback)
+    plain = clean_fb
+    html  = (
+        f"<p><strong>From:</strong> {clean_user}</p>"
+        f"<pre style='white-space:pre-wrap'>{clean_fb}</pre>"
+    )
+    await _send_via_sendgrid(ADMIN_EMAIL, subject, plain, html)
+
 
 async def send_password_reset_email(recipient: str, code: str) -> None:
-    # Debug: function entry
-    print(f"[INFO] send_password_reset_email() called for {recipient}, code={code}")
-
-    # Build the same “public_base_url” if you ever want a deep‑link button:
-    # link = f"{PUBLIC_BASE_URL}/reset?code={code}&email={recipient}"
-
-    # Compute a human‑readable expiry
-    expires = (datetime.utcnow() + timedelta(hours=1)).strftime("%B %d, %Y at %I:%M %p UTC")
-    # print(f"[DEBUG] reset code will expire at {expires}")
+    """
+    Send a 6‑digit password reset code.
+    """
+    print(f"[INFO] send_password_reset_email for {recipient!r} code={code}")
+    expires_at = (datetime.utcnow() + timedelta(hours=1)).strftime("%B %d, %Y at %I:%M %p UTC")
 
     subject = "Your Lab12 password‑reset code"
-
-    # Plain‑text fallback
-    plain = (
+    plain   = (
         f"Your Lab12 password‑reset code is {code}.\n"
-        f"It expires at {expires}.\n"
-        # f"Or click this link to reset now: {link}"
+        f"It expires at {expires_at}.\n"
     )
-
-    # HTML version, re‑using your verification styles
     html = f"""\
-      <!doctype html>
-      <html><head><meta charset="utf-8">
-        <style>
-          body {{ font-family: Helvetica, Arial, sans-serif; }}
-          .container {{
-            border: 1px solid #ccc;
-            padding: 20px;
-            border-radius: 6px;
-            max-width: 500px;
-            margin: auto;
-          }}
-          .code {{
-            font-size: 32px;
-            text-align: center;
-            margin: 18px 0;
-            font-weight: bold;
-          }}
-          .expires {{
-            text-align: center;
-            font-size: 13px;
-            color: #d40000;
-          }}
-          .btn {{
-            display: block;
-            width: 200px;
-            margin: 18px auto;
-            text-align: center;
-            background: #1a73e8;
-            color: #fff;
-            text-decoration: none;
-            padding: 12px 0;
-            border-radius: 4px;
-            font-weight: bold;
-          }}
-        </style>
-      </head><body>
-        <div class="container">
-          <h1 style="text-align:center; margin:0 0 18px;">Reset your password</h1>
-          <p style="text-align:center;">Use this 6‑digit code:</p>
-          <div class="code">{code}</div>
-          <p class="expires">Expires {expires}</p>
+<!doctype html>
+<html><head><meta charset="utf-8">
+  <style>
+    body {{ font-family: Helvetica, Arial, sans-serif; }}
+    .container {{ border: 1px solid #ccc; padding:20px; border-radius:6px; max-width:500px; margin:auto }}
+    .code {{ font-size:32px; text-align:center; margin:18px 0; font-weight:bold }}
+    .expires {{ text-align:center; font-size:13px; color:#d40000 }}
+  </style>
+</head><body>
+  <div class="container">
+    <h1 style="text-align:center; margin:0 0 18px">Reset your password</h1>
+    <p style="text-align:center">Use this 6‑digit code:</p>
+    <div class="code">{code}</div>
+    <p class="expires">Expires {expires_at}</p>
+  </div>
+</body></html>"""
 
-      </body></html>
-      """
-  
-    # Debug: payload sizes
-    # print(f"[DEBUG] HTML payload length: {len(html)} chars")
-
-    # Send it
-    try:
-        await _deliver(_build(recipient, subject, plain, html))
-        print(f"[INFO] Password‑reset email delivered to {recipient}")
-    except Exception as e:
-        print(f"[ERROR] Failed to deliver password‑reset email to {recipient}: {e}")
-        raise
+    await _send_via_sendgrid(recipient, subject, plain, html)

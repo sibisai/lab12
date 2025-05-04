@@ -36,3 +36,7 @@ google-auth-httplib2
 # testing
 pytest-asyncio
 aiosqlite
+
+# mail
+sendgrid>=6.9.1
+certifi
