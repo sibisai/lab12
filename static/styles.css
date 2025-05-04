@@ -500,17 +500,55 @@ input[type="password"]:focus {
   .content-box {
     height: 25vh;
   }
-
-  .navbar {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
+  /*
   .navbar-right {
     margin-top: 10px;
     width: 100%;
     justify-content: space-between;
   }
+  */
+  .navbar {
+    flex-direction: column;
+    /* Stack brand and links container */
+    align-items: flex-start;
+    /* Align items to the start (left) */
+    gap: 10px;
+    /* Add space between brand and the links container */
+  }
+
+  .navbar-links {
+    width: 100%;
+    /* Make links container take full width */
+    display: flex;
+    flex-direction: column;
+    /* Stack user info and buttons vertically */
+    align-items: flex-start;
+    /* Align items to the left */
+    gap: 8px;
+    /* Space between stacked items (user info, logout, feedback) */
+    margin-top: 10px;
+    /* Optional: Add a bit more margin from the brand */
+  }
+
+  /* Optional: Make buttons full width for easier tapping */
+  .navbar-links .nav-button,
+  .navbar-links .nav-link {
+    width: 100%;
+    justify-content: center;
+    /* Center text within buttons */
+    text-align: center;
+    box-sizing: border-box;
+    /* Include padding/border in width */
+  }
+
+  .navbar-links .user-info {
+    width: 100%;
+    /* Ensure user info takes full width */
+    text-align: left;
+    /* Align text left (or center if preferred) */
+    margin-bottom: 4px;
+    /* Add a little space below user info */
+    }
 }
 
 /* Loading indicator */
