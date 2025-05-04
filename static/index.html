@@ -280,66 +280,6 @@
       let currentUser = null;
       let lastQuota = null;
 
-      function updateModalUI(mode) {
-        authMode = mode; // Update global state
-
-        // Clear messages
-        errMsg.textContent = "";
-        okMsg.textContent = "";
-
-        // Reset common elements
-        email.readOnly = false;
-        fullnameGrp.style.display = "none";
-        passwordGroup.style.display = "none";
-        confGrp.style.display = "none";
-        pinGroup.style.display = "none"; // Hide PIN group by default
-        showPwdLabel.style.display = "none";
-        verifyActions.style.display = "none";
-        toggle.style.display = "block"; // Show by default
-
-        if (mode === "login") {
-          title.textContent = "Login";
-          email.parentElement.style.display = "block"; // Ensure email shown
-          passwordGroup.style.display = "block"; // Show Password
-          showPwdLabel.style.display = "flex";
-          submitB.textContent = "Log in";
-          toggle.textContent = "Create an account";
-          pwd.placeholder = "Password";
-          pwd.type = showPwd.checked ? "text" : "password";
-          pwd.autocomplete = "current-password";
-          pinInput.value = ""; // Clear PIN if switching back
-          pinInput.required = false;
-        } else if (mode === "signup") {
-          title.textContent = "Sign up";
-          fullnameGrp.style.display = "block"; // Show Full Name
-          email.parentElement.style.display = "block"; // Ensure email shown
-          passwordGroup.style.display = "block"; // Show Password
-          confGrp.style.display = "block";    // Show Confirm Password
-          showPwdLabel.style.display = "flex";
-          submitB.textContent = "Sign up";
-          toggle.textContent = "Already registered? Log in";
-          pwd.placeholder = "Enter a password";
-          pwd.type = showPwd.checked ? "text" : "password";
-          pwd.autocomplete = "new-password";
-          confirmInput.autocomplete = "new-password";
-          pinInput.value = ""; // Clear PIN
-          pinInput.required = false;
-        } else if (mode === "verify") {
-          title.textContent = "Verify E-mail";
-          okMsg.textContent = "Enter the 6-digit code we e-mailed you.";
-          email.parentElement.style.display = "block"; // Ensure email shown
-          email.readOnly = true; // Make email read-only
-          pinGroup.style.display = "block"; // Show PIN input group
-          passwordGroup.style.display = "none"; // Hide original password field
-          showPwdLabel.style.display = "none"; // Hide show password checkbox
-          toggle.style.display = "none"; // Hide mode toggle link
-          verifyActions.style.display = "block"; // Show Resend/Cancel links
-          submitB.textContent = "Verify";
-          pinInput.focus(); // Focus PIN input
-          pinInput.required = true;
-        }
-      }
-
       updateModalUI("login");
 
       toggle.addEventListener("click", () => updateModalUI(authMode === "login" ? "signup" : "login"));
@@ -419,6 +359,7 @@
           fullnameInput.required = false; // Not required for login
           confirmInput.required = false;
           pwd.required = true;
+          pinInput.required = false;
         } else if (mode === "signup") {
           title.textContent = "Sign up";
           fullnameGrp.style.display = "block";
@@ -436,6 +377,7 @@
           fullnameInput.required = true;
           pwd.required = true;
           confirmInput.required = true;
+          pinInput.required = false;
         } else if (mode === "verify") {
           title.textContent = "Verify E-mail";
           okMsg.textContent = "Enter the 6-digit code we e-mailed you."; // Initial message
