@@ -481,11 +481,17 @@
           // Restore button text based on the mode we were in *before* the error
           submitB.textContent = originalButtonText; // Restore original text
         } finally {
-          // Re-enable button only if verification isn't still pending or successful
-          if (!(authMode === 'verify' && okMsg.textContent.includes('Verified'))) {
+          // If we’re sitting on the verify screen, just re‐enable the button
+          // and leave its text alone (it was set by updateModalUI to “Verify”).
+          if (authMode === 'verify') {
             submitB.disabled = false;
-            // Restore button text if not already done in catch block
-            if (!errMsg.textContent) submitB.textContent = originalButtonText;
+            return;
+          }
+
+          // Otherwise, run the old restore logic
+          submitB.disabled = false;
+          if (!errMsg.textContent) {
+            submitB.textContent = originalButtonText;
           }
         }
       }
