@@ -333,7 +333,7 @@
 
       function updateModalUI(mode) {
         authMode = mode; // Update global state
-        console.log("Updating Modal UI to:", authMode); // Debug log
+        toggle.onclick = null;
 
         // Clear messages
         errMsg.textContent = "";
@@ -360,11 +360,15 @@
         // Configure based on mode
         if (mode === "login") {
           title.textContent = "Login";
+          pwd.disabled = false;
+          confirmInput.disabled = false;
+
           email.parentElement.style.display = "block";
           passwordGroup.style.display = "block";
           showPwdLabel.style.display = "flex"; // Show the label containing checkbox
           submitB.textContent = "Log in";
           toggle.textContent = "Create an account";
+          toggle.onclick = () => updateModalUI("signup");
           pwd.placeholder = "Password";
           pwd.type = showPwd.checked ? "text" : "password"; // Restore type based on checkbox
           pwd.autocomplete = "current-password";
@@ -373,6 +377,10 @@
           pwd.required = true;
           pinInput.required = false;
         } else if (mode === "signup") {
+          pwd.disabled = false;
+          confirmInput.disabled = false;
+          pinInput.disabled = false;
+
           title.textContent = "Sign up";
           fullnameGrp.style.display = "block";
           email.parentElement.style.display = "block";
@@ -381,6 +389,8 @@
           showPwdLabel.style.display = "flex";
           submitB.textContent = "Sign up";
           toggle.textContent = "Already registered? Log in";
+          toggle.onclick = () => updateModalUI("login");
+
           pwd.placeholder = "Enter a password";
           pwd.type = showPwd.checked ? "text" : "password";
           pwd.autocomplete = "new-password";
@@ -420,7 +430,10 @@
           pinGroup.style.display = "none";
           showPwdLabel.style.display = "none";
           verifyActions.style.display = "none";
-          toggle.style.display = "none";
+          // repurpose the bottom toggle as "Back to login"
+          toggle.style.display = "block";
+          toggle.textContent = "Back to login";
+          toggle.onclick = () => updateModalUI("login");
 
           // Button text
           submitB.textContent = "Send code";
@@ -455,7 +468,10 @@
 
           showPwdLabel.style.display = "none";
           verifyActions.style.display = "none";
-          toggle.style.display = "none";
+          // repurpose the bottom toggle as "Back to login"
+          toggle.style.display = "block";
+          toggle.textContent = "Back to login";
+          toggle.onclick = () => updateModalUI("login");
           submitB.textContent = "Reset";
         }
       }
@@ -478,7 +494,7 @@
             });
             okMsg.textContent = "If that email exists, code was sent";
             // switch to verify step after a moment
-            setTimeout(() => updateModalUI(RESET_VERIFY), 800);
+            setTimeout(() => updateModalUI(RESET_VERIFY), 2000);
             return;
           }
 
