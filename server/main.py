@@ -12,7 +12,7 @@ from fastapi import FastAPI, WebSocket, WebSocketException, HTTPException, Depen
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordRequestForm
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi import Cookie, Form
 from pydantic import BaseModel, Field
 from typing import Optional, Annotated
@@ -668,11 +668,11 @@ async def password_reset_verify(r: ResetConfirmReq, db: AsyncSession = Depends(g
     await update_user_password(db, uid, r.new_password)
     return {"detail":"Password has been reset."}
 
-@app.get("/")
-def health_check():
-    return { 'health_check': 'OK' }
+app.mount("/static", StaticFiles(directory="static", html=True), name="static")
 
-app.mount("/", StaticFiles(directory="static", html=True), name="static")
+@app.get("/", response_class=FileResponse)
+async def root():
+    return FileResponse("static/index.html")
 
 # ── Main entry point (for direct execution) ─────────────────────────────────
 if __name__ == "__main__":
