@@ -668,6 +668,9 @@ async def password_reset_verify(r: ResetConfirmReq, db: AsyncSession = Depends(g
     await update_user_password(db, uid, r.new_password)
     return {"detail":"Password has been reset."}
 
+@app.get("/")
+def health_check():
+    return { 'health_check': 'OK' }
 
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
