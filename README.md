@@ -2,6 +2,11 @@
 
 Offline streaming transcript + one-click AI lecture notes.
 
+**Dual‑licensed under [AGPL v3](https://www.gnu.org/licenses/agpl-3.0.html) OR Commercial License.  
+See [LICENSE](LICENSE) for full text.**
+
+![AGPL v3 License](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)
+
 ---
 
 ## Features
