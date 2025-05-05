@@ -24,7 +24,6 @@
 
       <link rel="icon" href="./favicon/favicon.ico">
       <title>lab12</title> <!-- Updated title -->
-      <script>window.currentUser = null;</script>
       <script>window.currentUserFullName = null;</script>      
 
       <!-- ––– Markdown renderer ––– -->
@@ -311,8 +310,6 @@
           updateAuthUI();
         }
       }
-
-      window.addEventListener("DOMContentLoaded", bootstrapAuth);
 
       function openModal() {
         modal.style.display = "flex";
@@ -682,11 +679,15 @@
 
 
       // --- Initial Setup ---
-      bootstrapAuth().then(fetchQuota); // Fetch user state on load
-      if (!currentUser) { // Check currentUser *after* bootstrapAuth potentially sets it
-        openModal();
-      }
-      updateModalUI(authMode); // Set initial UI state based on default authMode ('login')
+      window.addEventListener("DOMContentLoaded", async () => {
+        await bootstrapAuth();
+        await fetchQuota();
+        updateModalUI(authMode);
+
+        if (!currentUser) {
+          openModal();
+        }
+      });
       
 
       async function fetchQuota() {
@@ -1449,6 +1450,15 @@
 
       // Initial load
       loadSession();
+
+      ; (async () => {
+        // give the DOM a moment to settle
+        await new Promise(r => setTimeout(r, 50));
+        await bootstrapAuth();
+        if (currentUser) {
+          closeModal();
+        }
+      })();
 
     }); 
   </script>
