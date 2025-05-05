@@ -24,7 +24,7 @@ python -m venv venv && source venv/bin/activate
 # On Windows: venv\\Scripts\\activate
 
 # 3. Install Python dependencies
-pip install -r requirements.txt
+pip install -r server.requirements.txt
 
 # 4. Download the Vosk model (~1.8 GB)
 curl -L -o vosk-model-en-us-0.22.zip \\
@@ -122,18 +122,38 @@ Never commit `.env` to source control (add to `.gitignore`).
 
 ```text
 lab12/
+├── alembic/                  # Alembic migrations
+├── docs/                     # Project docs
+│   ├── CODE_OF_CONDUCT.md
+│   ├── CONTRIBUTING.md
+│   ├── COPYING.AGPL-3.0
+│   ├── PRIVACY.md
+│   └── SETUP.md
+├── models/                   # Vosk speech models
+│   └── vosk-model-...
+├── server/                   # Backend code
+│   ├── __pycache__/
+│   ├── __init__.py
+│   ├── crud.py
+│   ├── db.py
+│   ├── grant_admin.py
+│   ├── mailer.py
+│   ├── main.py
+│   ├── models.py
+│   ├── quota.py
+│   ├── requirements.txt
+│   └── seed.py
+├── static/                   # Frontend assets
+│   ├── favicon/
+│   ├── index.html
+│   └── styles.css
+├── venv/                     # Local virtual environment (ignored)
 ├── .dockerignore
+├── .env                      # Environment variables (ignored)
+├── .gitignore
+├── alembic.ini
 ├── docker-compose.yml
 ├── Dockerfile
-├── LICENSE
-├── PRIVACY.md
-├── CONTRIBUTING.md
-├── README.md
-├── SETUP.md                # (this file)
-├── static/
-│   └── ...
-├── models/
-│   └── vosk-model-...
-└── server/
-    └── ... (backend code)
+├── LICENSE.md
+└── README.md
 ```
