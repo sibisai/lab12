@@ -7,15 +7,15 @@
 
 <h1 align="center">Offline streaming transcription + one‑click AI notes</h1>
 
-<p>
-  <div align="center">
-    <a href="LICENSE"><img src="https://img.shields.io/badge/License-AGPL%20v3-blue.svg" alt="AGPLv3" /></a>
-  </div>
+<p align="center">
+  <a href="docs/PRIVACY.md">🔒 Privacy Policy</a>&emsp;
+  <a href="docs/SETUP.md">⚙️ Setup</a>&emsp;
+  <a href="docs/CONTRIBUTING.md">🤝 Contribute</a>
 </p>
 <p align="center">
-  <a href="PRIVACY.md">🔒 Privacy Policy</a>&emsp;
-  <a href="SETUP.md">⚙️ Setup</a>&emsp;
-  <a href="CONTRIBUTING.md">🤝 Contribute</a>
+  <a href="LICENSE.md#agpl-v3"><img src="https://img.shields.io/badge/License-AGPL%20v3-blue.svg" alt="AGPL v3" /></a>
+  &nbsp;
+  <a href="LICENSE.md#commercial-license"><img src="https://img.shields.io/badge/License-Commercial-blue.svg" alt="Commercial License" /></a>
 </p>
 
 ## Lab12
