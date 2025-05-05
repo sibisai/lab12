@@ -650,12 +650,29 @@ VERIFY_FAIL = "<h1>Invalid or expired link ❌</h1>"
 @app.get("/verify", response_class=HTMLResponse)
 async def verify_via_link(email: str, pin: str, db: AsyncSession = Depends(get_db)):
     ok = await crud.confirm_code(db, email, pin)
-    return VERIFY_OK if ok else VERIFY_FAIL
+    if ok:
+        try:
+            user = await crud.get_user_by_username(db, email)
+            total = await crud.count_verified_users(db)
+            await mailer.send_user_verified_alert(email, user.full_name, total)
+        except Exception:
+            logger.exception("Failed to send admin alert for email‑link verification")
+        return VERIFY_OK
+    return VERIFY_FAIL
 
 @app.post("/email/verify/check", summary="Verify a PIN code")
 async def check_pin(r: PinReq, db=Depends(get_db)):
     if not await crud.confirm_code(db, r.email, r.pin):
         raise HTTPException(400, "Invalid or expired code")
+    
+    # send admin alert
+    try:
+        user = await crud.get_user_by_username(db, r.email)
+        total = await crud.count_verified_users(db)
+        await mailer.send_user_verified_alert(r.email, user.full_name, total)
+    except Exception:
+        logger.exception("Failed to send admin alert for PIN verification")
+
     return {"detail": "verified"}
 
 class ResetConfirmReq(BaseModel):

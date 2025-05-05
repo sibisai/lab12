@@ -138,3 +138,34 @@ async def send_password_reset_email(recipient: str, code: str) -> None:
 </body></html>"""
 
     await _send_via_sendgrid(recipient, subject, plain, html)
+
+
+async def send_user_verified_alert(
+    user_email: str,
+    full_name: str | None = None,
+    total_verified: int = 0
+) -> None:
+    from datetime import datetime
+    import bleach
+
+    when = datetime.utcnow().strftime("%B %d, %Y at %I:%M %p UTC")
+    clean_email = bleach.clean(user_email)
+    clean_name  = bleach.clean(full_name) if full_name else "–"
+    subject = f"[Lab12] New user verified: {clean_email}"
+    plain = (
+        f"User verified their address:\n\n"
+        f" • Email           : {clean_email}\n"
+        f" • Name            : {clean_name}\n"
+        f" • When            : {when}\n"
+        f" • Total verified  : {total_verified}\n"
+    )
+    html = (
+        f"<p><strong>User verified their address:</strong></p>"
+        f"<ul>"
+        f"  <li><strong>Email:</strong> {clean_email}</li>"
+        f"  <li><strong>Name:</strong> {clean_name}</li>"
+        f"  <li><strong>When:</strong> {when}</li>"
+        f"  <li><strong>Total verified users:</strong> {total_verified}</li>"
+        f"</ul>"
+    )
+    await _send_via_sendgrid(ADMIN_EMAIL, subject, plain, html)

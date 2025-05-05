@@ -6,7 +6,7 @@ Asynchronous helper functions for DB access.
 import datetime, secrets
 from typing import Optional, Sequence
 import sqlalchemy as sa
-from sqlalchemy import select, update, insert
+from sqlalchemy import select, update, insert, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from passlib.context import CryptContext
 
@@ -285,4 +285,6 @@ async def update_user_password(db: AsyncSession, user_id: int, new_password: str
     )
     await db.commit()
 
-    
+async def count_verified_users(db: AsyncSession) -> int:
+    q = select(func.count()).select_from(User).where(User.email_verified == True)
+    return (await db.execute(q)).scalar_one()
