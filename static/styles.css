@@ -442,9 +442,12 @@ input[type="password"]:focus {
   display: inline-block;
   width: 8px;
   height: 8px;
+  min-width: 8px;
+  min-height: 8px;
   border-radius: 50%;
   background-color: #ccc;
   margin-right: 5px;
+  flex: 0 0 auto;
 }
 
 .status-dot.active {

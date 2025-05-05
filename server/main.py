@@ -393,7 +393,7 @@ class SumResp(BaseModel):
     outline: str
 
 @app.post("/summarize", response_model=SumResp)
-@limiter.limit(f"{RATE_LIMIT_SUMMARIZE_MINUTE};{RATE_LIMIT_SUMMARIZE_DAY}")
+@limiter.limit(f"{RATE_LIMIT_SUMMARIZE_MINUTE};{RATE_LIMIT_SUMMARIZE_DAY}", error_message="Rate limit exceeded: max 5 notes/minute, 100 notes/day.")
 async def summarize(
     request: Request,
     r: SumReq,
