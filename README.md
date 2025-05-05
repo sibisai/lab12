@@ -62,4 +62,4 @@ Thanks to all the libraries & services that power Lab12:
 - **SQLAlchemy**, **asyncpg**
 - **SendGrid**, **Passlib**
 
-<sup>Dual‑licensed under [AGPL v3](https://www.gnu.org/licenses/agpl-3.0.html) OR Commercial. See [LICENSE](LICENSE) for details.</sup>
+<sup>Dual‑licensed under [AGPL v3](https://www.gnu.org/licenses/agpl-3.0.html) OR Commercial. See [LICENSE](LICENSE.md) for details.</sup>
