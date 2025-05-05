@@ -21,3 +21,5 @@ __pycache__/
 *.zip
 
 alembic.ini
+
+.DS_Store
