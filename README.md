@@ -55,7 +55,7 @@ rm vosk-model-en-us-0.22.zip
 # 4. Set up PostgreSQL database and get connection string.
 
 # 5. Create a .env file and provide necessary secrets/config
-#    (Copy from .env.example or see .env Example section below)
+#    (See .env Example section below)
 #    Make sure to fill in your DATABASE_URL, OPENAI_API_KEY, Google keys etc.
 
 # 6. Run the server (ensure PostgreSQL is running if using local DB)
@@ -182,23 +182,34 @@ Create a file named `.env` in the project root:
 ```dotenv
 # Required Secrets
 OPENAI_API_KEY=sk-proj-...your_openai_api_key...
-INITIAL_AUTH_SECRET=replace_with_your_strong_secret_for_initial_login
+SENDGRID_API_KEY=SG....your_sendgrid_api_key...
 
-# Required for Google Drive Integration
-GOOGLE_API_KEY=AIzaSy...your_google_api_key...
-GOOGLE_CLIENT_ID=1234567890-abc...xyz.apps.googleusercontent.com
-
-# Required for Database connection (adjust as needed)
-DATABASE_URL=postgresql+asyncpg://livenote:lab12admin@localhost:5432/livenote
-
-# Optional - JWT Configuration (defaults are often suitable)
-# JWT_SECRET_KEY=a_different_strong_secret_for_signing_tokens
+# Optional - JWT Configuration (defaults provided in code)
+# JWT_SECRET_KEY=your_jwt_secret_key
 # JWT_ALGORITHM=HS256
 # JWT_ACCESS_TOKEN_EXPIRE_MINUTES=60
 
-# Optional - Rate Limiting (defaults are often suitable)
-# RATE_LIMIT_SUMMARIZE_MINUTE=5/minute
-# RATE_LIMIT_SUMMARIZE_DAY=100/day
+# Google APIs
+GOOGLE_API_KEY=AIzaSy...your_google_api_key...
+GOOGLE_CLIENT_ID=your_google_client_id.apps.googleusercontent.com
+
+# Database URLs
+# Local Postgres dev:
+# DATABASE_URL=postgresql+asyncpg://<user>:<pass>@localhost:5432/<dbname>
+
+# Docker dev:
+# DATABASE_URL=postgresql+asyncpg://<user>:<pass>@host.docker.internal:5432/<dbname>
+
+# RDS production:
+# DATABASE_URL=postgresql+asyncpg://<user>:<pass>@<rds-host>:5432/<dbname>
+
+# Email settings
+EMAIL_SENDER=no-reply@yourdomain.com
+# EMAIL_PASSWORD=your_email_password  # e.g. Gmail App Password
+
+# Notifications & URLs
+ADMIN_EMAIL=admin@yourdomain.com
+PUBLIC_BASE_URL=https://your-public-domain.com
 ```
 
 **Note:** Never commit your `.env` file to version control (add it to `.gitignore`).
