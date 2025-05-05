@@ -38,7 +38,7 @@ A real‑time transcription dashboard: live mic audio → offline Vosk speech‑
 2. **Generate** notes → OpenAI API → Markdown
 3. **Save** to Drive → OAuth & Picker → Google Doc
 
-_For full technical details and security info see [SETUP.md](SETUP.md)._
+_For full technical details and security info see [SETUP.md](docs/SETUP.md)._
 
 ---
 
@@ -54,7 +54,7 @@ _For full technical details and security info see [SETUP.md](SETUP.md)._
 
 Thanks to all the libraries & services that power Lab12:
 
-- **Vosk** (Alpha Cephei)
+- **Vosk** (offline speech‑to‑text engine, [Apache License 2.0](https://github.com/alphacep/vosk-api/tree/master?tab=Apache-2.0-1-ov-file#readme))
 - **OpenAI** (GPT‑4o)
 - **Google Drive & Picker APIs**
 - **FastAPI**, **Uvicorn**

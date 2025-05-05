@@ -22,7 +22,7 @@
                   ">
 
 
-      <link rel="icon" href="./favicon/favicon.ico">
+      <link rel="icon" href="/static/favicon/favicon.ico">
       <title>lab12</title> <!-- Updated title -->
       <script>window.currentUserFullName = null;</script>      
 
@@ -74,20 +74,12 @@
     <!-- ––––– Google JS API loader (for Picker) –––––            -->
     <script src="https://apis.google.com/js/api.js?onload=onGoogleApiLoad"  defer></script>
 
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="/static/styles.css">
     
 </head>
 
 <body>
-  <!-- Navigation Bar -->
-  <nav class="navbar">
-    <div class="navbar-brand">🎙️ Lab12</div>
-    <div class="navbar-links">
-      <span id="user-info" class="user-info hidden"></span> <!-- Placeholder for user info -->
-      <button id="auth-button" class="nav-button">Login</button> <!-- Placeholder for Login/Logout -->
-      <a href="#" id="feedback-link" class="nav-link">Feedback</a> <!-- Placeholder for Feedback -->
-    </div>
-  </nav>
+  {% include "partials/header.html" %}
 
   <div class="container">
     <!-- Status Indicator (Moved below controls for better visibility) -->
@@ -201,6 +193,7 @@
     </div>
 
   </div> <!-- End of .container -->
+  {% include "partials/footer.html" %}
 
   <script>
     document.addEventListener("DOMContentLoaded", function () {
@@ -688,6 +681,12 @@
           openModal();
         }
       });
+
+      document.getElementById('footer-feedback')
+        .addEventListener('click', e => {
+          e.preventDefault();
+          openFeedbackModal();
+        });
       
 
       async function fetchQuota() {
@@ -978,7 +977,7 @@
         try {
           stream = await navigator.mediaDevices.getUserMedia({ audio: true });
           audioCtx = new (window.AudioContext || window.webkitAudioContext)({
-            sampleRate: 16000
+            sampleRate: 48000
           });
           const source = audioCtx.createMediaStreamSource(stream);
 

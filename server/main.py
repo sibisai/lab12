@@ -11,8 +11,9 @@ from dotenv import load_dotenv # Import dotenv
 from fastapi import FastAPI, WebSocket, WebSocketException, HTTPException, Depends, status, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from fastapi.security import OAuth2PasswordRequestForm
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
 from fastapi import Cookie, Form
 from pydantic import BaseModel, Field
 from typing import Optional, Annotated
@@ -181,7 +182,7 @@ client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # ── Constants ───────────────────────────────────────────────────────────────
 MODEL_PATH  = "models/vosk-model-en-us-0.22"
-SAMPLE_RATE = 16_000  # Hz
+SAMPLE_RATE = 48_000  # Hz
 MAX_CUSTOM_INSTRUCTION_LENGTH = 500 # Max characters for simple custom instructions
 
 # Add Rate Limiter Middleware
@@ -641,9 +642,6 @@ async def cancel_verification(
     await db.commit()
     return {"detail": "Signup canceled; you may sign up again"}
 
-# verify link  (HTML response so it works when user clicks) ----
-from fastapi.responses import HTMLResponse
-
 VERIFY_OK   = "<h1>Email verified ✅</h1><p>You can close this tab.</p>"
 VERIFY_FAIL = "<h1>Invalid or expired link ❌</h1>"
 
@@ -698,11 +696,19 @@ async def password_reset_verify(r: ResetConfirmReq, db: AsyncSession = Depends(g
     await update_user_password(db, uid, r.new_password)
     return {"detail":"Password has been reset."}
 
-app.mount("/static", StaticFiles(directory="static", html=True), name="static")
+app.mount("/static", StaticFiles(directory="static"), name="static")
+# 2) tell FastAPI where your templates live
+templates = Jinja2Templates(directory="templates")
 
-@app.get("/", response_class=FileResponse)
-async def root():
-    return FileResponse("static/index.html")
+# 3) render index.html through Jinja so your partials can be included
+@app.get("/", response_class=HTMLResponse)
+async def get_index(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+# 4) same for docs
+@app.get("/docs-page", response_class=HTMLResponse)
+async def get_docs(request: Request):
+    return templates.TemplateResponse("docs.html", {"request": request})
 
 # ── Main entry point (for direct execution) ─────────────────────────────────
 if __name__ == "__main__":
