@@ -5,7 +5,7 @@ __pycache__/
 venv/
 
 # Docker / build artifacts
-models/           # your 1.8 GB model folder!
+models/
 *.zip
 
 # Environment
