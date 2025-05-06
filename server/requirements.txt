@@ -1,6 +1,6 @@
 fastapi==0.111.*
 uvicorn[standard]==0.29.*
-python-jose[cryptography]
+markdown
 # speech + websockets
 vosk==0.3.*
 websockets==12.*
@@ -27,6 +27,7 @@ alembic>=1.10
 # security
 bcrypt==4.0.1
 passlib[bcrypt]==1.7.4
+python-jose[cryptography]
 
 # Google Drive
 google-api-python-client
