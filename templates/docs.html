@@ -1,18 +1,9 @@
-<!doctype html>
-<html lang="en">
+{% extends "partials/base.html" %}
 
-<head>
-  <meta charset="utf-8">
-  <title>{{ title }}</title>
-  <link rel="stylesheet" href="/static/styles.css">
-</head>
+{% block title %}{{ page_title }}{% endblock %}
 
-<body>
-  {% include "partials/header.html" %}
-  <main class="docs-content">
-    {{ content | safe }}
-  </main>
-  {% include "partials/footer.html" %}
-</body>
-
-</html>
+{% block content %}
+<article class="doc-page">
+  {{ markdown_content | safe }}
+</article>
+{% endblock %}

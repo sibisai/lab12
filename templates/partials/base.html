@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- CLEAN CSP — no comments, no frame‑ancestors when using <meta>, add style‑src -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self';
+                  base-uri 'self';
+                  object-src 'none';
+                  script-src 'self' 'unsafe-inline' blob:
+                              https://cdnjs.cloudflare.com
+                              https://cdn.jsdelivr.net
+                              https://accounts.google.com
+                              https://apis.google.com;
+                  worker-src 'self' blob:;
+                  style-src 'self' 'unsafe-inline';
+                  img-src 'self' data:;
+                  font-src 'self' https://fonts.gstatic.com;
+                  connect-src 'self' https://accounts.google.com https://www.googleapis.com ws:;
+                  frame-src https://accounts.google.com https://picker.googleapis.com https://docs.google.com 
+                  ">
+
+
+  <link rel="icon" href="../../static/favicon/favicon.ico">
+  <title>lab12</title> <!-- Updated title -->
+  <script>window.currentUserFullName = null;</script>
+
+  <!-- ––– Markdown renderer ––– -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" referrerpolicy="no-referrer"></script>
+  <!-- HTML sanitizer -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.7/purify.min.js"></script>
+  <!-- ––––– Google Identity Services –––––                     -->
+  <script>
+    const GOOGLE_CLIENT_ID = "1024744015168-0nni6g7fg6q425lueq3s5ii98s85slek.apps.googleusercontent.com";
+    const GOOGLE_DRIVE_SCOPES = "https://www.googleapis.com/auth/drive.file";
+
+    // 2) A robust updater that looks up DOM/globals at call time
+    window.updateGDriveButtonState = function () {
+      const btn = document.getElementById("save-gdrive-btn");
+      if (!btn) return;
+      const ready = !!(window.googleTokenClient && window.pickerApiLoaded);
+      const notesExist = !!(window.notesMD && window.notesMD.trim());
+      const enabled = ready && !!window.currentUser && notesExist;
+      btn.disabled = !enabled;
+      btn.classList.toggle("hidden", !enabled);
+    };
+
+    function onGoogleGsiLoad() {
+      window.googleTokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: GOOGLE_DRIVE_SCOPES,
+        // wrap so it always calls the *current* global handler
+        callback: resp => window.handleGoogleTokenResponse(resp)
+      });
+      // console.log("onGoogleGsiLoad fired. Client:", window.googleTokenClient);
+      window.gisInited = true;
+      window.updateGDriveButtonState();
+    }
+
+    function onGoogleApiLoad() {
+      gapi.load("picker", () => {
+        // console.log("gapi.load('picker') callback fired."); // Add this log
+        window.pickerApiLoaded = true; // Make sure this line exists and is correct
+        // console.log("onGoogleApiLoad -> picker loaded. Flag:", window.pickerApiLoaded); // Log *after* setting
+        window.updateGDriveButtonState(); // Update state *after* flag is set
+      });
+    }
+  </script>
+
+
+  <script id="gsi" src="https://accounts.google.com/gsi/client" defer onload="onGoogleGsiLoad()"></script>
+
+  <!-- ––––– Google JS API loader (for Picker) –––––            -->
+  <script src="https://apis.google.com/js/api.js?onload=onGoogleApiLoad" defer></script>
+
+  <link rel="stylesheet" href="../../static/styles.css">
+
+</head>
+
+<body>
+  {% include "partials/header.html" %}
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  {% include "partials/footer.html" %}
+</body>
+
+</html>

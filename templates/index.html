@@ -1,85 +1,9 @@
-<!doctype html>
-<html lang="en">
 
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <!-- CLEAN CSP — no comments, no frame‑ancestors when using <meta>, add style‑src -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self';
-                  base-uri 'self';
-                  object-src 'none';
-                  script-src 'self' 'unsafe-inline' blob:
-                              https://cdnjs.cloudflare.com
-                              https://cdn.jsdelivr.net
-                              https://accounts.google.com
-                              https://apis.google.com;
-                  worker-src 'self' blob:;
-                  style-src 'self' 'unsafe-inline';
-                  img-src 'self' data:;
-                  font-src 'self' https://fonts.gstatic.com;
-                  connect-src 'self' https://accounts.google.com https://www.googleapis.com ws:;
-                  frame-src https://accounts.google.com https://picker.googleapis.com https://docs.google.com 
-                  ">
-
-
-      <link rel="icon" href="/static/favicon/favicon.ico">
-      <title>lab12</title> <!-- Updated title -->
-      <script>window.currentUserFullName = null;</script>      
-
-      <!-- ––– Markdown renderer ––– -->
-      <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" referrerpolicy="no-referrer"></script>
-      <!-- HTML sanitizer -->
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.7/purify.min.js"></script>
-    <!-- ––––– Google Identity Services –––––                     -->
-    <script>
-      const GOOGLE_CLIENT_ID = "1024744015168-0nni6g7fg6q425lueq3s5ii98s85slek.apps.googleusercontent.com";
-      const GOOGLE_DRIVE_SCOPES = "https://www.googleapis.com/auth/drive.file";
-
-      // 2) A robust updater that looks up DOM/globals at call time
-      window.updateGDriveButtonState = function () {
-        const btn = document.getElementById("save-gdrive-btn");
-        if (!btn) return;
-        const ready = !!(window.googleTokenClient && window.pickerApiLoaded);
-        const notesExist = !!(window.notesMD && window.notesMD.trim());
-        const enabled = ready && !!window.currentUser && notesExist;
-        btn.disabled = !enabled;
-        btn.classList.toggle("hidden", !enabled);
-      };
-
-      function onGoogleGsiLoad() {
-        window.googleTokenClient = google.accounts.oauth2.initTokenClient({
-          client_id: GOOGLE_CLIENT_ID,
-          scope: GOOGLE_DRIVE_SCOPES,
-          // wrap so it always calls the *current* global handler
-          callback: resp => window.handleGoogleTokenResponse(resp)
-        });
-        // console.log("onGoogleGsiLoad fired. Client:", window.googleTokenClient);
-        window.gisInited = true;
-        window.updateGDriveButtonState();
-      }
-
-      function onGoogleApiLoad() {
-        gapi.load("picker", () => {
-          // console.log("gapi.load('picker') callback fired."); // Add this log
-          window.pickerApiLoaded = true; // Make sure this line exists and is correct
-          // console.log("onGoogleApiLoad -> picker loaded. Flag:", window.pickerApiLoaded); // Log *after* setting
-          window.updateGDriveButtonState(); // Update state *after* flag is set
-        });
-      }
-    </script>
-
-
-    <script id="gsi" src="https://accounts.google.com/gsi/client" defer onload="onGoogleGsiLoad()"></script>
-
-    <!-- ––––– Google JS API loader (for Picker) –––––            -->
-    <script src="https://apis.google.com/js/api.js?onload=onGoogleApiLoad"  defer></script>
-
-    <link rel="stylesheet" href="/static/styles.css">
-    
-</head>
-
-<body>
-  {% include "partials/header.html" %}
+  {% extends "partials/base.html" %}
+  
+  {% block title %}Lab12 Home{% endblock %}
+  
+  {% block content %}
 
   <div class="container">
     <!-- Status Indicator (Moved below controls for better visibility) -->
@@ -89,49 +13,49 @@
     </div>
 
     <!-- Authentication Modal -->
-<div id="login-modal" class="login-page" style="display: none;">
-  <div class="login-container">
-    <span class="close-button" id="close-login-modal">&times;</span>
-    <h2 id="login-title">Login</h2>
-    <form id="login-form">
-      <div class="input-group" id="fullname-group" style="display:none">
-        <input id="login-fullname" name="full_name" type="text" placeholder="Full Name" autocomplete="name">
-      </div>
-      <div class="input-group">
-        <input id="login-email" type="email" placeholder="Email" autocomplete="email" required>
-      </div>
-      <div class="input-group" id="password-group"> <input id="login-password" type="password" placeholder="Password"
-          autocomplete="current-password" required>
-      </div>
-      <div class="input-group" id="confirm-group" style="display: none;">
-        <input id="login-confirm" name="password_confirm" type="password" placeholder="Re-enter password"
-          autocomplete="new-password">
-      </div>
-      <div class="input-group" id="pin-group" style="display: none;"> <input id="pin-code" type="text" name="pin"
-          placeholder="6-digit code" autocomplete="one-time-code" pattern="\d{6}" maxlength="6">
-      </div>
+    <div id="login-modal" class="login-page" style="display: none;">
+      <div class="login-container">
+        <span class="close-button" id="close-login-modal">&times;</span>
+        <h2 id="login-title">Login</h2>
+        <form id="login-form">
+          <div class="input-group" id="fullname-group" style="display:none">
+            <input id="login-fullname" name="full_name" type="text" placeholder="Full Name" autocomplete="name">
+          </div>
+          <div class="input-group">
+            <input id="login-email" type="email" placeholder="Email" autocomplete="email" required>
+          </div>
+          <div class="input-group" id="password-group"> <input id="login-password" type="password" placeholder="Password"
+              autocomplete="current-password" required>
+          </div>
+          <div class="input-group" id="confirm-group" style="display: none;">
+            <input id="login-confirm" name="password_confirm" type="password" placeholder="Re-enter password"
+              autocomplete="new-password">
+          </div>
+          <div class="input-group" id="pin-group" style="display: none;"> <input id="pin-code" type="text" name="pin"
+              placeholder="6-digit code" autocomplete="one-time-code" pattern="\d{6}" maxlength="6">
+          </div>
 
-      <label id="show-password-label" style="font-size:14px; margin-bottom:15px; display:flex; align-items:center;">
-        <input id="toggle-show-pwd" type="checkbox" style="margin-right:6px;">
-        Show password
-      </label>
+          <label id="show-password-label" style="font-size:14px; margin-bottom:15px; display:flex; align-items:center;">
+            <input id="toggle-show-pwd" type="checkbox" style="margin-right:6px;">
+            Show password
+          </label>
 
-      <p id="login-error" style="color:red;   height:1.2em;"></p>
-      <p id="login-success" style="color:green; height:1.2em;"></p>
-      <button type="submit" class="login-btn" id="login-submit">Log in</button>
-      <p class="forgot-container">
-        <a href="#" id="forgot-link">Forgot password?</a>
-      </p>
+          <p id="login-error" style="color:red;   height:1.2em;"></p>
+          <p id="login-success" style="color:green; height:1.2em;"></p>
+          <button type="submit" class="login-btn" id="login-submit">Log in</button>
+          <p class="forgot-container">
+            <a href="#" id="forgot-link">Forgot password?</a>
+          </p>
 
-      <div id="verify-actions" class="verify-actions"style="display: none; margin-top: 10px; font-size: 14px; text-align: center;">
-        <a href="#" id="resend-link" style="margin-right: 15px;">Resend Code</a>
-        <a href="#" id="cancel-link">Change Email</a>
+          <div id="verify-actions" class="verify-actions"style="display: none; margin-top: 10px; font-size: 14px; text-align: center;">
+            <a href="#" id="resend-link" style="margin-right: 15px;">Resend Code</a>
+            <a href="#" id="cancel-link">Change Email</a>
+          </div>
+
+          <p id="login-toggle" class="signup-link">Create an account</p>
+        </form>
       </div>
-
-      <p id="login-toggle" class="signup-link">Create an account</p>
-    </form>
-  </div>
-</div>
+    </div>
 
     <div class="controls">
       <button id="btn">🎤 Start Recording</button>
@@ -193,7 +117,7 @@
     </div>
 
   </div> <!-- End of .container -->
-  {% include "partials/footer.html" %}
+  {% endblock %}
 
   <script>
     document.addEventListener("DOMContentLoaded", function () {
@@ -1461,7 +1385,3 @@
 
     }); 
   </script>
-
-</body>
-
-</html>

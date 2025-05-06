@@ -15,6 +15,8 @@ from fastapi.templating import Jinja2Templates
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
 from fastapi import Cookie, Form
+import markdown
+from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import Optional, Annotated
 from vosk import Model, KaldiRecognizer
@@ -696,19 +698,56 @@ async def password_reset_verify(r: ResetConfirmReq, db: AsyncSession = Depends(g
     await update_user_password(db, uid, r.new_password)
     return {"detail":"Password has been reset."}
 
+# Front end:
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 # 2) tell FastAPI where your templates live
 templates = Jinja2Templates(directory="templates")
 
-# 3) render index.html through Jinja so your partials can be included
+BASE_DIR = Path(__file__).parent.parent   # one level up from server/
+DOCS_DIR = BASE_DIR / "docs"
+
+def render_markdown(path: str) -> str:
+    with open(path, "r", encoding="utf-8") as f:
+        text = f.read()
+    # you can also use `marked.js` on the client, but here we do it server‑side
+    return markdown.markdown(text, extensions=["fenced_code", "tables"])
+
+# ender index.html through Jinja so your partials can be included
 @app.get("/", response_class=HTMLResponse)
 async def get_index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
-# 4) same for docs
+# same for docs
 @app.get("/docs-page", response_class=HTMLResponse)
 async def get_docs(request: Request):
     return templates.TemplateResponse("docs.html", {"request": request})
+
+@app.get("/privacy", response_class=HTMLResponse)
+async def privacy(request: Request):
+    md_path = DOCS_DIR / "PRIVACY.md"
+    try:
+        html = render_markdown(md_path)
+    except FileNotFoundError:
+        raise HTTPException(404, "Privacy Policy not found")
+    return templates.TemplateResponse("docs.html", {
+        "request": request,
+        "markdown_content": html,
+        "page_title": "Privacy Policy"
+    })
+
+@app.get("/terms", response_class=HTMLResponse)
+async def terms(request: Request):
+    md_path = DOCS_DIR / "TERMS.md"
+    try:
+        html = render_markdown(md_path)
+    except FileNotFoundError:
+        raise HTTPException(404, "Terms of Service not found")
+    return templates.TemplateResponse("docs.html", {
+        "request": request,
+        "markdown_content": html,
+        "page_title": "Terms of Service"
+    })
 
 # ── Main entry point (for direct execution) ─────────────────────────────────
 if __name__ == "__main__":
