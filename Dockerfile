@@ -36,6 +36,4 @@ ENV PATH=/root/.local/bin:$PATH \
 
 EXPOSE 8080
 
-CMD ["sh","-c","uvicorn server.main:app \
-  --host 0.0.0.0 --port $PORT \
-  --ws-ping-interval 0"]
+CMD ["uvicorn", "server.main:app", "--host", "0.0.0.0", "--port", "8080", "--ws-ping-interval", "30", "--ws-ping-timeout", "60"]

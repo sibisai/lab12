@@ -280,6 +280,7 @@ async def login_for_access_token(
         samesite="lax",
         max_age=JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         path="/",
+        domain=".lab12note.com",
     )
     return resp
 
