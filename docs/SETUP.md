@@ -123,12 +123,13 @@ Never commit `.env` to source control (add to `.gitignore`).
 ```text
 lab12/
 ├── alembic/                  # Alembic migrations
-├── docs/                     # Project docs
+├── docs/                     # Project documentation
 │   ├── CODE_OF_CONDUCT.md
 │   ├── CONTRIBUTING.md
 │   ├── COPYING.AGPL-3.0
 │   ├── PRIVACY.md
-│   └── SETUP.md
+│   ├── SETUP.md
+│   └── TERMS.md
 ├── models/                   # Vosk speech models
 │   └── vosk-model-...
 ├── server/                   # Backend code
@@ -145,8 +146,14 @@ lab12/
 │   └── seed.py
 ├── static/                   # Frontend assets
 │   ├── favicon/
-│   ├── index.html
 │   └── styles.css
+├── templates/                # Jinja2 templates
+│   ├── partials/
+│   │   ├── base.html
+│   │   ├── header.html
+│   │   └── footer.html
+│   ├── docs.html
+│   └── index.html
 ├── venv/                     # Local virtual environment (ignored)
 ├── .dockerignore
 ├── .env                      # Environment variables (ignored)
