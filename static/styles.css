@@ -448,6 +448,10 @@ input[type="password"]:focus {
   resize: vertical;
 }
 
+#footer-feedback.hidden + .feedback-mx {
+  display: none;
+}
+
 .status {
   display: inline-block;
   font-size: 14px;

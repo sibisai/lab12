@@ -3,7 +3,9 @@
 {% block title %}{{ page_title }}{% endblock %}
 
 {% block content %}
-<article class="doc-page">
-  {{ markdown_content | safe }}
-</article>
+<div class="container">
+  <article class="doc-page">
+    {{ markdown_content|safe }}
+  </article>
+</div>
 {% endblock %}
