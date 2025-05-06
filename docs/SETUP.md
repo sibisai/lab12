@@ -157,3 +157,17 @@ lab12/
 ├── LICENSE.md
 └── README.md
 ```
+
+---
+
+## Acknowledgements
+
+Thanks to all the libraries & services that power Lab12:
+
+- **Vosk** (offline speech‑to‑text engine, [Apache License 2.0](https://github.com/alphacep/vosk-api/tree/master?tab=Apache-2.0-1-ov-file#readme))
+- **OpenAI** (GPT‑4o)
+- **Google Drive & Picker APIs**
+- **FastAPI**, **Uvicorn**
+- **Marked.js**, **SlowAPI**
+- **SQLAlchemy**, **asyncpg**
+- **SendGrid**, **Passlib**
