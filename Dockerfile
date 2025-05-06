@@ -30,7 +30,12 @@ COPY --from=builder /app/static     /app/static
 # Assumes you have the model in ./models/vosk-model-en-us-0.22 next to your Dockerfile
 COPY ./models/vosk-model-en-us-0.22 /app/models/vosk-model-en-us-0.22
 
-ENV PATH=/root/.local/bin:$PATH
+ENV PATH=/root/.local/bin:$PATH \
+  SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt \
+  PORT=8080
 
-EXPOSE 8000
-CMD ["uvicorn", "server.main:app", "--host", "0.0.0.0", "--port", "8000"]
+EXPOSE 8080
+
+CMD ["sh","-c","uvicorn server.main:app \
+  --host 0.0.0.0 --port $PORT \
+  --ws-ping-interval 0"]

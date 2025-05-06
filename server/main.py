@@ -65,7 +65,7 @@ load_dotenv()
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "a-very-strong-secret-key-please-change") # Secret for signing JWTs
 JWT_ALGORITHM = "HS256"
 JWT_ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", 60)) # Token validity period
-PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "http://localhost:8000")
+PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "https://lab12note.com")
 
 # ── HTML sanitising helpers ────────────────────────────────────────────────
 EXTRA_TAGS   = {"h1", "h2", "ul", "ol", "li", "br", "p"}       # bullets & breaks too
@@ -196,8 +196,6 @@ app.add_middleware(SlowAPIMiddleware)
 # app.add_middleware(
 #     CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
 # )
-
-PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "https://lab12note.com")
 
 app.add_middleware(
     CORSMiddleware,
