@@ -46,7 +46,7 @@ _For full technical details and security info see [SETUP.md](docs/SETUP.md)._
 
 - Dark mode
 - Robust testing & CI/CD
-- Shareable links & “pro” subscription
+- Convert to a modern SPA frontend (React or Angular)
 
 ---
 
