@@ -259,14 +259,15 @@ async def login_for_access_token(
     if not user.email_verified:
         raise HTTPException(status_code=403, detail="Please verify your e‑mail first")
     
-    secure_cookie = not os.getenv("DEV_INSECURE")
+    # secure_cookie = not os.getenv("DEV_INSECURE")
     access_token = create_access_token({"sub": user.username})
     resp = JSONResponse({"username": user.username})
     resp.set_cookie(
         key="access_token",
         value=access_token,
         httponly=True,
-        secure=secure_cookie,          # ✓ only over HTTPS
+        secure=True,          # ✓ only over HTTPS
+        # secure=secure_cookie,
         samesite="lax",
         max_age=JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         path="/",
