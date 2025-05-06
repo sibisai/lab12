@@ -141,17 +141,22 @@ body {
 }
 
 .navbar-brand {
-  /* Renamed from .logo */
-  font-size: 20px;
-  font-weight: bold;
+  display: inline-flex;
+  align-items: center;
+  font-size: 1.25rem;
+  /* ~20px */
+  font-weight: 700;
+  text-decoration: none;
   color: var(--primary);
 }
 
-.navbar-links {
-  /* Renamed from .navbar-right */
-  display: flex;
-  align-items: center;
-  gap: 15px;
+.navbar-logo {
+  display: block;
+  /* no descender gaps */
+  width: 1.5rem;
+  /* ~24px—match your font height */
+  height: 1.5rem;
+  margin-right: 0.5rem;
 }
 
 .navbar-links .user-info {
@@ -221,6 +226,30 @@ body {
   gap: 10px;
   margin-bottom: 20px;
   flex-wrap: wrap;
+}
+
+.login-banner {
+  flex: 1 1 100%;
+  /* take up a full row in the flex container */
+  display: flex;
+  /* center its contents */
+  align-items: center;
+  /* justify-content: center; */
+  gap: 0.5rem;
+  /* space between icon & text */
+  padding: 0.75rem 1rem;
+  /* a bit of breathing room */
+  margin-bottom: 1rem;
+  /* separate from buttons below */
+
+  background-color: #f1f3f5;
+  /* light grey background */
+  border-left: 4px solid var(--warning);
+  /* accent bar on the left */
+  border-radius: var(--border-radius);
+
+  font-size: 0.95rem;
+  color: var(--secondary);
 }
 
 button {

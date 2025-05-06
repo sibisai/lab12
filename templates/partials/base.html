@@ -1,89 +1,1367 @@
 <!doctype html>
 <html lang="en">
 
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <!-- CLEAN CSP — no comments, no frame‑ancestors when using <meta>, add style‑src -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self';
-                  base-uri 'self';
-                  object-src 'none';
-                  script-src 'self' 'unsafe-inline' blob:
-                              https://cdnjs.cloudflare.com
-                              https://cdn.jsdelivr.net
-                              https://accounts.google.com
-                              https://apis.google.com;
-                  worker-src 'self' blob:;
-                  style-src 'self' 'unsafe-inline';
-                  img-src 'self' data:;
-                  font-src 'self' https://fonts.gstatic.com;
-                  connect-src 'self' https://accounts.google.com https://www.googleapis.com ws:;
-                  frame-src https://accounts.google.com https://picker.googleapis.com https://docs.google.com 
-                  ">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- CLEAN CSP — no comments, no frame‑ancestors when using <meta>, add style‑src -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self';
+                    base-uri 'self';
+                    object-src 'none';
+                    script-src 'self' 'unsafe-inline' blob:
+                                https://cdnjs.cloudflare.com
+                                https://cdn.jsdelivr.net
+                                https://accounts.google.com
+                                https://apis.google.com;
+                    worker-src 'self' blob:;
+                    style-src 'self' 'unsafe-inline';
+                    img-src 'self' data:;
+                    font-src 'self' https://fonts.gstatic.com;
+                    connect-src 'self' https://accounts.google.com https://www.googleapis.com ws:;
+                    frame-src https://accounts.google.com https://picker.googleapis.com https://docs.google.com 
+                    ">
 
 
-  <link rel="icon" href="../../static/favicon/favicon.ico">
-  <title>lab12</title> <!-- Updated title -->
-  <script>window.currentUserFullName = null;</script>
+    <link rel="icon" href="../../static/favicon/favicon.ico">
+    <title>lab12</title> <!-- Updated title -->
+    <script>window.currentUserFullName = null;</script>
 
-  <!-- ––– Markdown renderer ––– -->
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" referrerpolicy="no-referrer"></script>
-  <!-- HTML sanitizer -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.7/purify.min.js"></script>
-  <!-- ––––– Google Identity Services –––––                     -->
-  <script>
-    const GOOGLE_CLIENT_ID = "1024744015168-0nni6g7fg6q425lueq3s5ii98s85slek.apps.googleusercontent.com";
-    const GOOGLE_DRIVE_SCOPES = "https://www.googleapis.com/auth/drive.file";
+    <!-- ––– Markdown renderer ––– -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" referrerpolicy="no-referrer"></script>
+    <!-- HTML sanitizer -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.7/purify.min.js"></script>
+    <!-- ––––– Google Identity Services –––––                     -->
+    <script>
+      const GOOGLE_CLIENT_ID = "1024744015168-0nni6g7fg6q425lueq3s5ii98s85slek.apps.googleusercontent.com";
+      const GOOGLE_DRIVE_SCOPES = "https://www.googleapis.com/auth/drive.file";
 
-    // 2) A robust updater that looks up DOM/globals at call time
-    window.updateGDriveButtonState = function () {
-      const btn = document.getElementById("save-gdrive-btn");
-      if (!btn) return;
-      const ready = !!(window.googleTokenClient && window.pickerApiLoaded);
-      const notesExist = !!(window.notesMD && window.notesMD.trim());
-      const enabled = ready && !!window.currentUser && notesExist;
-      btn.disabled = !enabled;
-      btn.classList.toggle("hidden", !enabled);
-    };
+      // 2) A robust updater that looks up DOM/globals at call time
+      window.updateGDriveButtonState = function () {
+        const btn = document.getElementById("save-gdrive-btn");
+        if (!btn) return;
+        const ready = !!(window.googleTokenClient && window.pickerApiLoaded);
+        const notesExist = !!(window.notesMD && window.notesMD.trim());
+        const enabled = ready && !!window.currentUser && notesExist;
+        btn.disabled = !enabled;
+        btn.classList.toggle("hidden", !enabled);
+      };
 
-    function onGoogleGsiLoad() {
-      window.googleTokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: GOOGLE_CLIENT_ID,
-        scope: GOOGLE_DRIVE_SCOPES,
-        // wrap so it always calls the *current* global handler
-        callback: resp => window.handleGoogleTokenResponse(resp)
-      });
-      // console.log("onGoogleGsiLoad fired. Client:", window.googleTokenClient);
-      window.gisInited = true;
-      window.updateGDriveButtonState();
-    }
+      function onGoogleGsiLoad() {
+        window.googleTokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: GOOGLE_CLIENT_ID,
+          scope: GOOGLE_DRIVE_SCOPES,
+          // wrap so it always calls the *current* global handler
+          callback: resp => window.handleGoogleTokenResponse(resp)
+        });
+        // console.log("onGoogleGsiLoad fired. Client:", window.googleTokenClient);
+        window.gisInited = true;
+        window.updateGDriveButtonState();
+      }
 
-    function onGoogleApiLoad() {
-      gapi.load("picker", () => {
-        // console.log("gapi.load('picker') callback fired."); // Add this log
-        window.pickerApiLoaded = true; // Make sure this line exists and is correct
-        // console.log("onGoogleApiLoad -> picker loaded. Flag:", window.pickerApiLoaded); // Log *after* setting
-        window.updateGDriveButtonState(); // Update state *after* flag is set
-      });
-    }
-  </script>
+      function onGoogleApiLoad() {
+        gapi.load("picker", () => {
+          // console.log("gapi.load('picker') callback fired."); // Add this log
+          window.pickerApiLoaded = true; // Make sure this line exists and is correct
+          // console.log("onGoogleApiLoad -> picker loaded. Flag:", window.pickerApiLoaded); // Log *after* setting
+          window.updateGDriveButtonState(); // Update state *after* flag is set
+        });
+      }
+    </script>
 
 
-  <script id="gsi" src="https://accounts.google.com/gsi/client" defer onload="onGoogleGsiLoad()"></script>
+    <script id="gsi" src="https://accounts.google.com/gsi/client" defer onload="onGoogleGsiLoad()"></script>
 
-  <!-- ––––– Google JS API loader (for Picker) –––––            -->
-  <script src="https://apis.google.com/js/api.js?onload=onGoogleApiLoad" defer></script>
+    <!-- ––––– Google JS API loader (for Picker) –––––            -->
+    <script src="https://apis.google.com/js/api.js?onload=onGoogleApiLoad" defer></script>
 
-  <link rel="stylesheet" href="../../static/styles.css">
+    <link rel="stylesheet" href="../../static/styles.css">
 
-</head>
+  </head>
 
-<body>
-  {% include "partials/header.html" %}
-  <main>
-    {% block content %}{% endblock %}
-  </main>
-  {% include "partials/footer.html" %}
-</body>
+  <body>
+    {% include "partials/header.html" %}
+    <main>
+      {% block content %}{% endblock %}
+    </main>
+    {% include "partials/footer.html" %}
+
+      <script>
+        document.addEventListener("DOMContentLoaded", function () {
+          const $ = selector => {
+            if (selector.startsWith("#")) selector = selector.slice(1);
+            return document.getElementById(selector);
+          };
+
+          window.notesMD = "";
+
+          window.handleGoogleTokenResponse = (tokenResponse) => {
+            window.googleAccessToken = tokenResponse.access_token;
+            console.log("Google access token:", window.googleAccessToken);
+            window.updateGDriveButtonState();
+          };
+
+          let authMode = "login"; // Possible values: "login", "signup", "verify"
+          let verificationEmail = ""; // Store email used for verification
+          const RESET_REQ = "reset-request";
+          const RESET_VERIFY = "reset-verify";
+
+
+          const modal = $("login-modal");
+          const title = $("login-title");
+          const form = $("login-form");
+          const email = $("login-email");
+          const pwd = $("login-password");
+          const confirmInput = $("login-confirm");
+          const submitB = $("login-submit");
+          const errMsg = $("login-error");
+          const okMsg = $("login-success");
+
+          const fullnameInput = $("login-fullname");
+          const fullnameGrp = $("fullname-group");
+          const confGrp = $("confirm-group");
+          const toggle = $("login-toggle");
+          const showPwd = $("toggle-show-pwd");
+          const showPwdLabel = $("show-password-label"); // Get label
+          const passwordGroup = $("password-group"); // Get password group
+          const pinGroup = $("pin-group");           // Get new PIN group
+          const pinInput = $("pin-code");             // Get new PIN input
+          const verifyActions = $("verify-actions");    // Get verification actions div
+          const resendLink = $("resend-link");          // Get resend link
+          const cancelLink = $("cancel-link");          // Get cancel link
+
+          // Navbar elements
+          const authButton = $("auth-button");
+          const userInfoSpan = $("user-info");
+          const footerFeedback = document.getElementById("footer-feedback");
+          const loginBanner = document.getElementById("login-banner");
+
+
+          // Feedback Modal elements
+          const feedbackModal = $("feedback-modal");
+          const feedbackForm = $("feedback-form");
+          const cancelFeedbackBtn = $("cancel-feedback");
+          const feedbackText = $("feedback-text");
+          const submitFeedbackBtn = $("submit-feedback"); // Get submit button
+          const msg = document.getElementById("feedback-msg");
+          const wsProtocol = location.protocol === "https:" ? "wss" : "ws";
+          const WS_BASE_URL = `${wsProtocol}://${location.host}/ws/stt`;
+          const LOCAL_STORAGE_KEY = "liveNoteSession";
+          const GOOGLE_APP_ID = GOOGLE_CLIENT_ID.split("-")[0];
+
+          let ws, audioCtx, processor, stream, running = false, paused = false;
+          let saveTimeout;
+          let googleAccessToken = null;
+          let pickerOpenRequested = false;
+
+          const log = $("log");
+          const full = $("full");
+          const notes = $("notes");
+          const sumBtn = $("sum");
+          const saveGDriveBtn = $("save-gdrive-btn");
+          const clearAllBtn = $("clear-all-btn");
+          const notesSection = $("notes-section");
+          const statusDot = $("status-dot");
+          const statusText = $("status-text");
+          const startBtn = $("btn");
+          const pauseBtn = $("pause-btn");
+          const toggleCustomInstructionsBtn = $("toggle-custom-instructions");
+          const customInstructionsSection = $("custom-instructions-section");
+          const customInstructionsTextarea = $("custom-instructions");
+          const copyBtn = $("copy-notes");
+
+          let currentUser = null;
+          let lastQuota = null;
+
+          updateModalUI("login");
+
+          toggle.addEventListener("click", () => updateModalUI(authMode === "login" ? "signup" : "login"));
+
+          const forgotLink = $("forgot-link");
+          forgotLink.addEventListener("click", e => {
+            e.preventDefault();
+            updateModalUI(RESET_REQ);
+          });
+
+          async function bootstrapAuth() {
+            const res = await fetch("/me", { credentials: "include" });
+            if (res.ok) {
+              const { username, full_name } = await res.json();
+              currentUser = username;
+              window.currentUserFullName = full_name;      // ← store full name
+              updateAuthUI();
+            } else {
+              currentUser = null;
+              window.currentUserFullName = null;
+              updateAuthUI();
+            }
+          }
+
+          function openModal() {
+            modal.style.display = "flex";
+            errMsg.textContent = okMsg.textContent = "";
+          }
+
+          function closeModal() {
+            modal.style.display = "none";
+          }
+
+          toggle.addEventListener("click", () => {
+            updateModalUI(authMode === "login" ? "signup" : "login");
+          });
+
+          showPwd.addEventListener("change", () => {
+            const t = showPwd.checked ? "text" : "password";
+            pwd.type = confirmInput.type = t;
+          });
+
+          function updateModalUI(mode) {
+            authMode = mode; // Update global state
+            toggle.onclick = null;
+
+            // Clear messages
+            errMsg.textContent = "";
+            okMsg.textContent = "";
+            // Clear inputs
+            fullnameInput.value = "";
+            // email.value = ""; // Keep email field populated when switching
+            pwd.value = "";
+            confirmInput.value = "";
+            pinInput.value = "";
+
+
+            // Reset common elements visibility/state
+            email.readOnly = false;
+            fullnameGrp.style.display = "none";
+            passwordGroup.style.display = "none";
+            confGrp.style.display = "none";
+            pinGroup.style.display = "none";
+            showPwdLabel.style.display = "none";
+            verifyActions.style.display = "none";
+            toggle.style.display = "block"; // Show toggle link by default
+            submitB.disabled = false; // Ensure button is enabled
+
+            const forgotContainer = document.querySelector('.forgot-container');
+            forgotContainer.style.display = (mode === 'login' ? 'block' : 'none');
+
+            // Configure based on mode
+            if (mode === "login") {
+              title.textContent = "Login";
+              pwd.disabled = false;
+              confirmInput.disabled = false;
+
+              email.parentElement.style.display = "block";
+              passwordGroup.style.display = "block";
+              showPwdLabel.style.display = "flex"; // Show the label containing checkbox
+              submitB.textContent = "Log in";
+              toggle.textContent = "Create an account";
+              toggle.onclick = () => updateModalUI("signup");
+              pwd.placeholder = "Password";
+              pwd.type = showPwd.checked ? "text" : "password"; // Restore type based on checkbox
+              pwd.autocomplete = "current-password";
+              fullnameInput.required = false; // Not required for login
+              confirmInput.required = false;
+              pwd.required = true;
+              pinInput.required = false;
+            } else if (mode === "signup") {
+              pwd.disabled = false;
+              confirmInput.disabled = false;
+              pinInput.disabled = false;
+
+              title.textContent = "Sign up";
+              fullnameGrp.style.display = "block";
+              email.parentElement.style.display = "block";
+              passwordGroup.style.display = "block";
+              confGrp.style.display = "block";
+              showPwdLabel.style.display = "flex";
+              submitB.textContent = "Sign up";
+              toggle.textContent = "Already registered? Log in";
+              toggle.onclick = () => updateModalUI("login");
+
+              pwd.placeholder = "Enter a password";
+              pwd.type = showPwd.checked ? "text" : "password";
+              pwd.autocomplete = "new-password";
+              confirmInput.autocomplete = "new-password";
+              // Set required fields for signup
+              fullnameInput.required = true;
+              pwd.required = true;
+              confirmInput.required = true;
+              pinInput.required = false;
+            } else if (mode === "verify") {
+              title.textContent = "Verify Email";
+              okMsg.textContent = "Check your inbox for the code"; // Initial message
+              submitB.textContent = "Verify";
+              email.parentElement.style.display = "block";
+              email.readOnly = true; // Make email read-only
+              pinGroup.style.display = "block"; // Show PIN input ONLY
+              // Ensure others are hidden (redundant but safe)
+              fullnameGrp.style.display = "none";
+              passwordGroup.style.display = "none";
+              confGrp.style.display = "none";
+              showPwdLabel.style.display = "none";
+              toggle.style.display = "none"; // Hide mode toggle link
+              verifyActions.style.display = "block"; // Show Resend/Cancel
+              // Set required for PIN
+              pinInput.required = true;
+              fullnameInput.required = false;
+              pwd.required = false;
+              confirmInput.required = false;
+              pinInput.focus();
+            } else if (mode === RESET_REQ) {
+              title.textContent = "Reset password";
+
+              // Show only email
+              email.parentElement.style.display = "block";
+              passwordGroup.style.display = "none";
+              confGrp.style.display = "none";
+              pinGroup.style.display = "none";
+              showPwdLabel.style.display = "none";
+              verifyActions.style.display = "none";
+              // repurpose the bottom toggle as "Back to login"
+              toggle.style.display = "block";
+              toggle.textContent = "Back to login";
+              toggle.onclick = () => updateModalUI("login");
+
+              // Button text
+              submitB.textContent = "Send code";
+
+              // Validation
+              email.required = true;
+
+              // Turn off any leftover required constraints
+              pwd.required = false;
+              pwd.disabled = true;
+              confirmInput.required = false;
+              confirmInput.disabled = true;
+              pinInput.required = false;
+              pinInput.disabled = true;
+            } else if (mode === RESET_VERIFY) {
+              title.textContent = "Enter reset code";
+
+              email.parentElement.style.display = "block";
+              pinGroup.style.display = "block";
+              passwordGroup.style.display = "block";
+              confGrp.style.display = "block";
+
+              // Validation
+              pinInput.required = true;
+              pwd.required = true;
+              confirmInput.required = true;
+
+              // Make sure they’re enabled
+              pwd.disabled = false;
+              confirmInput.disabled = false;
+              pinInput.disabled = false;
+
+              showPwdLabel.style.display = "none";
+              verifyActions.style.display = "none";
+              // repurpose the bottom toggle as "Back to login"
+              toggle.style.display = "block";
+              toggle.textContent = "Back to login";
+              toggle.onclick = () => updateModalUI("login");
+              submitB.textContent = "Reset";
+            }
+          }
+
+          // --- NEW Combined Submit Handler ---
+          async function handleAuthSubmit(e) {
+            e.preventDefault();
+            errMsg.textContent = "";
+            okMsg.textContent = "";
+            const originalButtonText = submitB.textContent; // Store original text
+            submitB.disabled = true;
+            submitB.textContent = "Working...";
+
+            try {
+              if (authMode === RESET_REQ) {
+                const res = await fetch("/auth/password-reset/request", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ email: email.value })
+                });
+                okMsg.textContent = "If that email exists, code was sent";
+                submitB.disabled = true;
+                // switch to verify step after a moment
+                setTimeout(() => updateModalUI(RESET_VERIFY), 2000);
+                return;
+              }
+
+              if (authMode === RESET_VERIFY) {
+                submitB.disabled = false;
+                // validate new pw/confirm match
+                if (pwd.value !== confirmInput.value) throw new Error("Passwords don't match");
+                const res = await fetch("/auth/password-reset/verify", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    email: email.value,
+                    code: pinInput.value,
+                    new_password: pwd.value
+                  })
+                });
+                if (!res.ok) {
+                  const err = await res.json().catch(() => ({ detail: "Reset failed" }));
+                  throw new Error(err.detail);
+                }
+                okMsg.textContent = "✅ Done – please log in";
+                // back to login
+                setTimeout(() => updateModalUI("login"), 1200);
+                return;
+              }
+              if (authMode === "login") {
+
+                const fd = new FormData();
+                fd.append("username", email.value);
+                fd.append("password", pwd.value);
+
+                const res = await fetch("/token", {
+                  method: "POST",
+                  body: fd,
+                  credentials: "include"
+                });
+
+                if (res.status === 403) {
+                  // un‑verified user: switch to the verify UI
+                  verificationEmail = email.value;      // remember which email
+                  updateModalUI("verify");             // show the PIN input
+                  okMsg.textContent = "Check your inbox for the code";
+                  // submitB.disabled = false;
+                  // submitB.textContent = "Verify";
+                  return;
+                }
+
+                if (!res.ok) {
+                  const { detail = "Login failed" } = await res.json().catch(() => ({ detail: "Login failed" }));
+                  throw new Error(detail);
+                }
+
+
+                // 200: fully authenticated
+                await bootstrapAuth();
+                okMsg.textContent = "Success! Loading…";
+                setTimeout(() => { closeModal(); loadSession(); }, 500);
+
+              } else if (authMode === "signup") {
+                if (pwd.value !== confirmInput.value) { throw new Error("Passwords do not match"); }
+                const fd = new FormData();
+                fd.append("username", email.value);
+                fd.append("password", pwd.value);
+                fd.append("full_name", fullnameInput.value.trim());
+                const res = await fetch("/register", { method: "POST", body: fd, credentials: "include" });
+                if (!res.ok) { const { detail = "Registration failed" } = await res.json().catch(() => ({ detail: "Registration failed" })); throw new Error(detail); }
+                verificationEmail = email.value; // Store email
+                updateModalUI("verify"); // Switch UI state
+
+              } else if (authMode === "verify") {
+                const pin = pinInput.value.trim();
+                if (!pin || !/^\d{6}$/.test(pin)) { throw new Error("Please enter the 6-digit code."); }
+                const res = await fetch("/email/verify/check", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ email: verificationEmail, pin: pin })
+                });
+                if (!res.ok) { const { detail = "Wrong / expired code." } = await res.json().catch(() => ({ detail: "Verification failed" })); throw new Error(detail); }
+                okMsg.textContent = "✅ Verified - you can now log in";
+                setTimeout(() => {
+                  // Reset to login state after success message shows
+                  email.readOnly = false;
+                  verificationEmail = "";
+                  updateModalUI("login");
+                  // closeModal(); // Optionally close modal
+                  // location.reload(); // Optionally reload page
+                }, 1500);
+              }
+            } catch (err) {
+              console.error(`Error during ${authMode}:`, err);
+              errMsg.textContent = err.message;
+              // Restore button text based on the mode we were in *before* the error
+              submitB.textContent = originalButtonText; // Restore original text
+            } finally {
+              // If we’re sitting on the verify screen, just re‐enable the button
+              // and leave its text alone (it was set by updateModalUI to “Verify”).
+              if (authMode === 'verify') {
+                submitB.disabled = false;
+                return;
+              }
+
+              // Otherwise, run the old restore logic
+              submitB.disabled = false;
+              if (!errMsg.textContent) {
+                submitB.textContent = originalButtonText;
+              }
+            }
+          }
+
+          // --- NEW Event Handler Functions for Verification Actions ---
+          async function handleResendCode(e) {
+            e.preventDefault();
+            if (!verificationEmail) return;
+
+            errMsg.textContent = "";
+            okMsg.textContent = "Sending new code...";
+            resendLink.style.pointerEvents = "none";
+            resendLink.style.opacity = "0.5";
+
+            try {
+              const res = await fetch("/email/verify/send", {
+                method: "POST",
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: verificationEmail })
+              });
+              if (!res.ok) {
+                const { detail = "Failed to resend code." } = await res.json().catch(() => ({})); throw new Error(detail);
+              }
+              okMsg.textContent = "✅ New code sent";
+              pinInput.value = ""; // Clear old pin
+              pinInput.focus();
+            } catch (err) {
+              errMsg.textContent = err.message;
+            } finally {
+              setTimeout(() => {
+                resendLink.style.pointerEvents = "auto";
+                resendLink.style.opacity = "1";
+              }, 5000); // Prevent spamming resend
+            }
+          }
+
+          async function handleCancelSignup(e) {
+            e.preventDefault();
+            if (!verificationEmail) return;
+
+            const userEmailToCancel = verificationEmail; // Capture before clearing
+            // Reset UI immediately back to default login state
+            verificationEmail = "";
+            email.value = ""; // Clear email field if desired, or keep it?
+            // pwd.value = "";
+            pinInput.value = "";
+            email.readOnly = false;
+            updateModalUI("signup");
+            okMsg.textContent = "Email cleared"; // Give feedback
+
+            // Optional: Call backend to delete unverified user/code in background
+            try {
+              await fetch("/email/verify/cancel", {
+                method: "POST",
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: userEmailToCancel }) // Use captured email
+              });
+              console.log("Backend cancellation requested for:", userEmailToCancel);
+            } catch (err) {
+              console.error("Failed to send cancel request to backend:", err);
+              // UI is already reset, maybe notify user backend cleanup might fail?
+            }
+          }
+
+
+          // --- Attach Event Listeners ---
+          form.addEventListener("submit", handleAuthSubmit); // Use the new handler
+          toggle.addEventListener("click", () => updateModalUI(authMode === "login" ? "signup" : "login")); // Use the new UI updater
+          showPwd.addEventListener("change", () => { // Keep this as is
+            const t = showPwd.checked ? "text" : "password";
+            pwd.type = confirmInput.type = t; // Affects both password fields if needed
+          });
+          resendLink.addEventListener("click", handleResendCode); // Attach resend handler
+          cancelLink.addEventListener("click", handleCancelSignup); // Attach cancel handler
+
+
+          // --- Initial Setup ---
+          window.addEventListener("DOMContentLoaded", async () => {
+            await bootstrapAuth();
+            await fetchQuota();
+            updateModalUI(authMode);
+
+            if (!currentUser) {
+              openModal();
+            }
+          });
+
+          document.getElementById('footer-feedback')
+            .addEventListener('click', e => {
+              e.preventDefault();
+              openFeedbackModal();
+            });
+
+
+          async function fetchQuota() {
+            const res = await fetch("/me/quota", { credentials: "include" });
+            if (res.ok) {
+              lastQuota = await res.json();
+              paintQuota();
+            }
+          }
+          function paintQuota() {
+            const el = document.getElementById("quota-info");
+            if (!currentUser || !lastQuota) {
+              el.classList.add("hidden");
+              return;
+            }
+
+            let text;
+            if (lastQuota.remaining === "∞" || lastQuota.plan.name === "admin") {
+              text = "Credits: Unlimited";
+            } else {
+              // clamp to zero so you never see negative
+              const rem = Math.max(0, lastQuota.remaining);
+              text = `Credits: ${rem} / ${lastQuota.plan.quota}`;
+            }
+
+            el.textContent = text;
+            el.classList.remove("hidden");
+          }
+
+          // --- Add Event Listeners for Modal Close Buttons ---
+          const closeLoginBtn = $("close-login-modal");
+          const closeFeedbackBtn = $("close-feedback-modal");
+
+          if (closeLoginBtn) {
+            closeLoginBtn.onclick = closeModal;
+          }
+          if (closeFeedbackBtn) {
+            closeFeedbackBtn.onclick = closeFeedbackModal;
+          }
+
+          // --- Function to update Clear All button visibility --- START
+          function updateClearAllButtonVisibility() {
+            const hasLogContent = log.textContent.trim().length > 0;
+            const hasFullContent = full.textContent.trim().length > 0;
+            const hasNotesContent = notes.innerHTML.trim().length > 0;
+            const hasContent = hasLogContent || hasFullContent || hasNotesContent;
+            clearAllBtn.classList.toggle("hidden", !hasContent);
+          }
+          // --- Function to update Clear All button visibility --- END
+
+          function updateAuthUI() {
+            window.currentUser = currentUser;
+
+            if (footerFeedback) {
+              footerFeedback.classList.toggle("hidden", !window.currentUser);
+            }
+            if (loginBanner) {
+              loginBanner.classList.toggle("hidden", !!currentUser);
+            }
+            if (currentUser) {
+              fetchQuota();
+              const name = window.currentUserFullName || currentUser;
+              userInfoSpan.textContent = `Welcome back, ${name}!`;
+              userInfoSpan.classList.remove("hidden");
+              authButton.textContent = "Logout";
+              authButton.onclick = logout;
+              if (footerFeedback) {
+                footerFeedback.classList.toggle("hidden", !window.currentUser);
+              }
+            } else {
+              userInfoSpan.textContent = "";
+              userInfoSpan.classList.add("hidden");
+              authButton.textContent = "Login";
+              authButton.onclick = openModal;
+            }
+
+            sumBtn.disabled = !(full.textContent.trim() && currentUser);
+            updateGDriveButtonState();
+            updateClearAllButtonVisibility();
+          }
+
+          async function logout() {
+            await fetch("/logout", {
+              method: "POST",
+              credentials: "include"
+            });
+            currentUser = null;
+            updateAuthUI();
+          }
+          authButton.onclick = logout;
+
+          // Check token status on initial load
+          updateAuthUI();
+          if (!currentUser) {
+            openModal(); // Open login if not logged in
+          }
+
+          // --- Feedback Modal --- 
+          function openFeedbackModal() {
+            feedbackModal.classList.remove("hidden");
+          }
+
+          function closeFeedbackModal() {
+            feedbackModal.classList.add("hidden");
+            feedbackText.value = ""; // Clear text on close
+          }
+
+          if (footerFeedback) {
+            footerFeedback.addEventListener("click", e => {
+              e.preventDefault();
+              openFeedbackModal();
+            });
+          }
+          cancelFeedbackBtn.onclick = closeFeedbackModal;
+
+          feedbackForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const feedback = feedbackText.value.trim();
+            if (!feedback) {
+              alert("Please enter your feedback before submitting.");
+              return;
+            }
+            if (!currentUser) {
+              alert("Please log in to submit feedback.");
+              openModal();
+              return;
+            }
+
+            submitFeedbackBtn.disabled = true;
+            submitFeedbackBtn.textContent = "Submitting...";
+
+            try {
+              const res = await fetchWithAuth("/feedback", {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ feedback_text: feedback })
+              });
+
+              if (!res.ok) {
+                msg.textContent = err.detail || "Submission failed.";
+                msg.style.color = "red";
+              } else {
+                msg.textContent = "✅ Thanks for your feedback!";
+                msg.style.color = "green";
+                // auto‑close in a few seconds:
+                setTimeout(closeFeedbackModal, 1500);
+              }
+
+              const result = await res.json();
+            } catch (err) {
+              console.error("Error submitting feedback:", err);
+              alert(`Failed to submit feedback: ${err.message}`);
+            } finally {
+              submitFeedbackBtn.disabled = false;
+              submitFeedbackBtn.textContent = "Submit";
+            }
+          });
+
+          // --- Fetch with Auth --- 
+          async function fetchWithAuth(url, options = {}) {
+            if (!currentUser) {
+              console.error("No JWT token found. Please log in.");
+              openModal(); // Prompt login
+              throw new Error("Authentication required.");
+            }
+
+            const response = await fetch(url, { ...options, credentials: "include" });
+
+            if (response.status === 401) {
+              // Unauthorized, likely expired token
+              console.warn("JWT token expired or invalid. Logging out.");
+              logout();
+              throw new Error("Session expired. Please log in again.");
+            }
+            return response;
+          }
+
+          // --- Status Update --- 
+          function updateStatus(state, message) {
+            // console.log(`Updating status: ${state} - ${message}`); // Debug log
+            statusText.textContent = message;
+            // Reset classes first
+            statusDot.className = "status-dot";
+            statusText.className = "status";
+
+            switch (state) {
+              case "ready":
+                statusText.textContent = message;
+                break;
+              case "connecting":
+                statusDot.classList.add("paused"); // Use warning color for connecting
+                statusText.classList.add("paused");
+                break;
+              case "active":
+              case "recording": // Treat recording as active
+                statusDot.classList.add("active");
+                statusText.classList.add("active");
+                break;
+              case "paused":
+                statusDot.classList.add("paused");
+                statusText.classList.add("paused");
+                break;
+              case "summarizing":
+                statusDot.classList.add("paused"); // Use warning color for summarizing
+                statusText.classList.add("paused");
+                break;
+              case "error":
+                statusDot.classList.add("error");
+                statusText.classList.add("error");
+                break;
+              default:
+                console.warn("Unknown status state:", state);
+            }
+          }
+
+          // --- WebSocket Handling --- 
+          function connectWebSocket() {
+            if (!currentUser) {
+              openModal();
+              return;
+            }
+            const wsUrl = WS_BASE_URL;
+            ws = new WebSocket(wsUrl);
+            updateStatus("connecting", "Connecting...");
+
+            ws.onopen = () => {
+              console.log("WebSocket connected");
+              running = true;
+              paused = false;
+              updateStatus("active", "Recording...");
+              startBtn.textContent = "🛑 Stop Recording";
+              startBtn.classList.add("recording");
+              pauseBtn.classList.remove("hidden");
+              pauseBtn.textContent = "⏸️ Pause";
+              pauseBtn.classList.remove("paused");
+              startAudioProcessing();
+            };
+
+            let interimNode = null;
+
+            ws.onmessage = event => {
+              const data = JSON.parse(event.data);
+
+              if (data.error) {
+                console.error("WebSocket error:", data.error);
+                updateStatus("error", `Error: ${data.error}`);
+                stopRecording();
+                return;
+              }
+
+              // Final result
+              if (data.text !== undefined) {
+                // Remove any existing interim line
+                if (interimNode) {
+                  interimNode.remove();
+                  interimNode = null;
+                }
+                // Append the final transcript chunk
+                appendLog(data.text, /* isFinal= */ true);
+                updateFullTranscript(data.text);
+
+                // Interim (partial) result
+              } else if (data.partial !== undefined) {
+                // If we don't yet have an interim node, create one
+                if (!interimNode) {
+                  interimNode = document.createElement("div");
+                  interimNode.style.color = "grey";
+                  log.appendChild(interimNode);
+                  log.scrollTop = log.scrollHeight;
+                }
+                // Update its text with the latest partial
+                interimNode.textContent = data.partial;
+              }
+            };
+
+            ws.onerror = error => {
+              console.error("WebSocket error:", error);
+              updateStatus("error", "Connection error");
+              running = false;
+            };
+
+            ws.onclose = (event) => {
+              console.log("WebSocket closed:", event.code, event.reason);
+              running = false;
+              paused = false;
+              updateStatus("ready", event.reason || "Disconnected");
+              startBtn.textContent = "🎤 Start Recording";
+              startBtn.classList.remove("recording");
+              pauseBtn.classList.add("hidden");
+              stopAudioProcessing();
+              // Attempt to reconnect if closed unexpectedly?
+            };
+          }
+
+          // --- Audio Processing --- 
+          async function startAudioProcessing() {
+            try {
+              stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+              audioCtx = new (window.AudioContext || window.webkitAudioContext)({
+                sampleRate: 48000
+              });
+              const source = audioCtx.createMediaStreamSource(stream);
+
+              // --- Embed AudioWorklet code --- START
+              const workletCode = `
+                  class AudioProcessor extends AudioWorkletProcessor {
+                    process(inputs, outputs, parameters) {
+                      const input = inputs[0];
+                      if (input.length > 0) {
+                        const channelData = input[0]; // Use the first channel
+                        const buffer = new Int16Array(channelData.length);
+                        for (let i = 0; i < channelData.length; i++) {
+                          buffer[i] = Math.max(-1, Math.min(1, channelData[i])) * 32767; // Convert to Int16
+                        }
+                        this.port.postMessage(buffer, [buffer.buffer]); // Send buffer, transferring ownership
+                      }
+                      return true; // Keep processor alive
+                    }
+                  }
+                  registerProcessor('audio-processor', AudioProcessor);
+                `;
+              const blob = new Blob([workletCode], { type: 'application/javascript' });
+              const workletURL = URL.createObjectURL(blob);
+              // --- Embed AudioWorklet code --- END
+
+              await audioCtx.audioWorklet.addModule(workletURL); // Use Blob URL
+              processor = new AudioWorkletNode(audioCtx, "audio-processor");
+              source.connect(processor).connect(audioCtx.destination);
+
+              processor.port.onmessage = (event) => {
+                if (ws && ws.readyState === WebSocket.OPEN && !paused) {
+                  // console.debug("sending audio chunk, bytes:", event.data.byteLength);
+                  ws.send(event.data); // Send Int16Array audio chunk
+                } else {
+                  // console.warn("not sending chunk—ws.ready?", ws.readyState, "paused?", paused);
+                }
+              };
+
+            } catch (err) {
+              console.error("Error accessing microphone or setting up audio:", err);
+              updateStatus("error", "Mic access failed");
+              stopRecording();
+            }
+          }
+
+          function stopAudioProcessing() {
+            if (stream) {
+              stream.getTracks().forEach(track => track.stop());
+              stream = null;
+            }
+            if (processor) {
+              processor.disconnect();
+              processor = null;
+            }
+            if (audioCtx) {
+              audioCtx.close();
+              audioCtx = null;
+            }
+          }
+
+          // --- UI Updates --- 
+          function appendLog(text, isFinal) {
+            const entry = document.createElement("div");
+            entry.textContent = text;
+            if (isFinal) {
+              entry.style.color = "black";
+            } else {
+              entry.style.color = "grey";
+            }
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+            updateClearAllButtonVisibility(); // Update button visibility
+          }
+
+          function updateFullTranscript(text) {
+            full.textContent += text + " ";
+            saveSession();
+            sumBtn.disabled = !(full.textContent.trim() && currentUser);
+            updateClearAllButtonVisibility(); // Update button visibility
+          }
+
+          function renderNotes(markdown) {
+            window.notesMD = markdown;
+
+            // --- UI toggles ---
+            notesSection.classList.remove("hidden");
+            // togglePreviewBtn.classList.remove("hidden");
+            copyBtn.classList.remove("hidden");
+            copyBtn.disabled = !markdown.trim();
+            updateGDriveButtonState();
+
+            const html = DOMPurify.sanitize(marked.parse(markdown), { USE_PROFILES: { html: true } });
+            notes.innerHTML = html;
+
+            // --- bookkeeping ---
+            notes.scrollTop = 0;
+            saveSession();
+            updateClearAllButtonVisibility();
+          }
+
+          // --- Actions --- 
+          function startRecording() {
+            if (running) return; // Already running
+            clearAllContent(false);
+            localStorage.removeItem(LOCAL_STORAGE_KEY);
+            connectWebSocket();
+          }
+
+          function stopRecording() {
+            if (!running) return;
+            if (ws) {
+              ws.close();
+            }
+            stopAudioProcessing();
+            running = false;
+            paused = false;
+            startBtn.textContent = "🎤 Start Recording";
+            startBtn.classList.remove("recording");
+            pauseBtn.classList.add("hidden");
+            updateStatus("ready", "Stopped");
+            saveSession(); // Final save
+          }
+
+          function togglePause() {
+            if (!running) return;
+            paused = !paused;
+            if (paused) {
+              pauseBtn.textContent = "▶️ Resume";
+              pauseBtn.classList.add("paused");
+              updateStatus("paused", "Paused");
+              // if (ws && ws.readyState === WebSocket.OPEN) {
+              //   ws.send(JSON.stringify({ command: "pause" })); // Inform backend if needed
+              // }
+            } else {
+              pauseBtn.textContent = "⏸️ Pause";
+              pauseBtn.classList.remove("paused");
+              updateStatus("active", "Recording...");
+              // if (ws && ws.readyState === WebSocket.OPEN) {
+              //   ws.send(JSON.stringify({ command: "resume" })); // Inform backend if needed
+              // }
+            }
+          }
+
+          async function generateNotes() {
+            if (!full.textContent.trim()) return;
+            if (!currentUser) { openModal(); return; }
+
+            sumBtn.disabled = true;
+            sumBtn.innerHTML = "📝 Generating Notes <span class=\"loading\"></span>";
+            updateStatus("summarizing", "Generating notes...");
+
+            try {
+              const instructions = customInstructionsTextarea.value.trim() || null;
+              const payload = {
+                transcript: full.textContent,
+                custom_instructions: instructions
+              };
+
+              const res = await fetch("/summarize", {
+                method: "POST",
+                credentials: "include",            // ← include HttpOnly cookie
+                headers: {
+                  "Content-Type": "application/json"
+                },
+                body: JSON.stringify(payload)
+              });
+
+              if (!res.ok) {
+                let msg;
+                if (res.status === 429) {
+                  msg = "Slow down! You can only generate 5 notes per minute (100 per day).";
+                } else {
+                  const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
+                  msg = err.detail;
+                }
+                throw new Error(msg);
+              }
+
+              const { outline } = await res.json();
+              renderNotes(outline);
+              await fetchQuota();
+              updateStatus("ready", "Notes generated");
+
+            } catch (err) {
+              console.error("Error generating notes:", err);
+              updateStatus("error", `Notes Error: ${err.message}`);
+            } finally {
+              sumBtn.disabled = !(full.textContent.trim());
+              sumBtn.innerHTML = "📝 Generate Notes";
+            }
+          }
+
+          function clearAllContent(confirmNeeded = true) {
+            if (confirmNeeded) {
+              if (!confirm("Are you sure you want to clear all transcripts and notes?")) {
+                return;
+              }
+            }
+            log.innerHTML = "";
+            full.textContent = "";
+            notes.innerHTML = "";
+            window.notesMD = "";
+            notesSection.classList.add("hidden");
+            sumBtn.disabled = true;
+            saveGDriveBtn.classList.add("hidden");
+            copyBtn.classList.add("hidden");
+            copyBtn.disabled = true;
+            updateClearAllButtonVisibility(); // Update button visibility
+            updateStatus("ready", "Content cleared");
+          }
+
+          function toggleCustomInstructions() {
+            customInstructionsSection.classList.toggle("hidden");
+          }
+
+          // function toggleNotePreview() {
+          //   isPreviewMode = !isPreviewMode;
+          //   togglePreviewBtn.textContent = isPreviewMode ? "Raw" : "Preview";
+          //   renderNotes(window.notesMD); // Re-render with the new mode
+          // }
+
+          // --- Session Saving/Loading --- 
+          function saveSession() {
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(() => {
+              const sessionData = {
+                logHTML: log.innerHTML,
+                fullText: full.textContent,
+                notesMarkdown: window.notesMD,
+                customInstructions: customInstructionsTextarea.value
+              };
+              localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(sessionData));
+              console.log("Session saved");
+            }, 500); // Debounce saving
+          }
+
+          function loadSession() {
+            const savedData = localStorage.getItem(LOCAL_STORAGE_KEY);
+            if (savedData) {
+              try {
+                const sessionData = JSON.parse(savedData);
+                log.innerHTML = sessionData.logHTML || "";
+                full.textContent = sessionData.fullText || "";
+                customInstructionsTextarea.value = sessionData.customInstructions || "";
+                if (sessionData.notesMarkdown) {
+                  renderNotes(sessionData.notesMarkdown);
+                }
+                console.log("Session loaded");
+                updateStatus("ready", "Session loaded");
+              } catch (e) {
+                console.error("Failed to load session:", e);
+                localStorage.removeItem(LOCAL_STORAGE_KEY); // Clear corrupted data
+              }
+            }
+            // console.log("loadSession - Notes MD Length:", window.notesMD?.length);
+            // Update UI elements based on loaded content
+            sumBtn.disabled = !(full.textContent.trim() && currentUser);
+            updateGDriveButtonState();
+            updateClearAllButtonVisibility(); // Ensure button visibility is correct on load
+          }
+
+          window.handleGoogleTokenResponse = (tokenResponse) => {
+            googleAccessToken = tokenResponse.access_token;
+            // console.log("Google Access Token obtained.");
+            if (pickerOpenRequested) {
+              createPicker();
+              pickerOpenRequested = false;
+            }
+          };
+
+          function requestGoogleAccessToken() {
+            // console.log("requestGoogleAccessToken called.")
+            if (!window.googleTokenClient) {
+              console.warn("GSI client not ready yet");
+              return;
+            }
+            if (window.googleTokenClient) {
+              // console.log("Calling googleTokenClient.requestAccessToken...");
+              // Prompt the user to select a Google Account and ask for consent to share their data
+              // when establishing a new session.
+              window.googleTokenClient.requestAccessToken({ prompt: "consent" });
+            } else {
+              console.error("Google Token Client not initialized.");
+            }
+          }
+
+          function openGooglePicker() {
+            // console.log("openGooglePicker called.");
+            if (!window.notesMD) { return; }
+            if (!currentUser) { openModal(); return; }
+
+            pickerOpenRequested = true;
+            // console.log("openGooglePicker: Checking googleAccessToken:", googleAccessToken);
+
+            if (googleAccessToken) {
+              // console.log("openGooglePicker: Access token exists, calling createPicker...");
+
+              createPicker();
+            } else {
+              // console.log("openGooglePicker: Access token MISSING, calling requestGoogleAccessToken...");
+
+              requestGoogleAccessToken();
+            }
+          }
+
+          function createPicker() {
+            // console.log("createPicker called.");
+            if (!googleAccessToken || !window.pickerApiLoaded) {
+              console.error("Cannot create picker: Missing token or Picker API not loaded.");
+              return;
+            }
+
+            const titleMatch = window.notesMD.match(/^#\s*(.+)$/m);
+            let baseName = titleMatch ? titleMatch[1].trim() : "lecture-notes";
+            const dateMatch = window.notesMD.match(/^\*\*Date & Time:\*\*\s*(.+)$/m);
+            if (dateMatch) {
+              const safeDate = dateMatch[1].replace(/, /g, "_").replace(/ at /i, "_").replace(/[:\s]+/g, "-").replace(/[^0-9A-Za-z\-_]/g, "");
+              baseName = `${baseName}_${safeDate}`;
+            }
+            baseName = baseName.replace(/[^0-9A-Za-z\-_]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+            const filename = `${baseName}.md`; // Save as Markdown
+
+            const folderView = new google.picker.DocsView(google.picker.ViewId.FOLDERS)
+              .setIncludeFolders(true)
+              .setSelectFolderEnabled(true);
+
+            // console.log("Building picker with folderView..."); // Log before build
+
+            // Build the picker using the correct view variable:
+            const picker = new google.picker.PickerBuilder()
+              .setAppId(GOOGLE_APP_ID)
+              .setOAuthToken(googleAccessToken)
+              .addView(folderView) // <--- CORRECTED LINE
+              .setCallback((data) => pickerCallback(data, filename))
+              // Optional: Add feature to create new folders within the picker
+              .enableFeature(google.picker.Feature.CREATE_NEW_FOLDER)
+              .build();
+
+            // console.log("Showing picker..."); // Log before setVisible
+            picker.setVisible(true);
+            // console.log("picker.setVisible(true) called."); // Log after setVisible
+          }
+          async function pickerCallback(data, filename) {
+            if (data.action === google.picker.Action.PICKED) {
+              const folder = data.docs[0];
+              const folderId = folder.id;
+              const folderName = folder.name; // Good to have for logging/status
+              // console.log(`Folder selected: ${folderName} (ID: ${folderId}). Preparing to call backend.`);
+
+              // -------- START: Generate HTML like Copy Button --------
+              let generatedHtml;
+              try {
+                if (!window.notesMD) { // Check if notesMD exists first
+                  throw new Error("Notes markdown is empty.");
+                }
+                // Ensure DOMPurify is loaded (it's included in your <head>)
+                if (typeof DOMPurify === 'undefined') {
+                  throw new Error("DOMPurify library is not loaded.");
+                }
+                const dirtyHtml = marked.parse(window.notesMD);
+                generatedHtml = DOMPurify.sanitize(dirtyHtml, { USE_PROFILES: { html: true } });
+                // console.log("Generated sanitized HTML for Drive upload.");
+              } catch (err) {
+                console.error("Error generating/sanitizing HTML for Drive:", err);
+                alert(`Failed to prepare notes for saving: ${err.message}`);
+                // Optional: Re-enable button if preparation fails
+                saveGDriveBtn.disabled = false;
+                saveGDriveBtn.innerHTML = "💾 Save to Google Drive";
+                updateStatus("error", `Failed to prepare notes: ${err.message}`);
+                return;
+              }
+              // -------- END: Generate HTML --------
+
+
+              // Ensure we have everything needed (check generatedHtml instead of notesMD)
+              if (!generatedHtml || !folderId || !googleAccessToken || !filename) {
+                console.error("Missing data for backend save:", { hasNotes: !!generatedHtml, folderId, hasToken: !!googleAccessToken, filename });
+                alert("Cannot save to drive: missing required information.");
+                return;
+              }
+
+              saveGDriveBtn.disabled = true;
+              saveGDriveBtn.innerHTML = "💾 Saving... <span class=\"loading\"></span>";
+              updateStatus("active", `Saving to Drive...`); // Update status
+
+              try {
+                // Call YOUR backend endpoint
+                const res = await fetchWithAuth("/save-to-drive", { // Use fetchWithAuth
+                  method: "POST",
+                  credentials: "include", // Assuming you use cookies now based on backend code
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    // *** CHANGE: Send HTML instead of Markdown ***
+                    notes_html: generatedHtml,       // <--- SEND THIS
+                    // notes_content: window.notesMD, // <--- REMOVE THIS
+                    filename: filename,
+                    folder_id: folderId,
+                    google_access_token: googleAccessToken
+                  })
+                });
+
+                const result = await res.json(); // Parse response from *your* backend
+
+                if (!res.ok) {
+                  // Use error detail from your backend response
+                  throw new Error(result.detail || `Backend Error ${res.status}`);
+                }
+
+                // console.log("Backend save successful:", result);
+                // Use the filename returned by the backend
+                const savedFileName = result.file_name || filename;
+                alert(`✅ Notes saved successfully to Google Drive as '${savedFileName}'!`);
+                updateStatus("ready", `Saved as '${savedFileName}'`);
+
+              } catch (err) {
+                console.error("Error saving via backend:", err);
+                alert(`Failed to save to Google Drive: ${err.message}`);
+                updateStatus("error", `Save failed: ${err.message}`);
+              } finally {
+                saveGDriveBtn.disabled = false; // Re-enable button
+                saveGDriveBtn.innerHTML = "💾 Save to Google Drive";
+              }
+            } else if (data.action === google.picker.Action.CANCEL) {
+              console.log("Google Picker cancelled by user.");
+              updateStatus("ready", "Save to Drive cancelled.");
+            }
+          }
+          // --- Event Listeners --- 
+          startBtn.onclick = () => { running ? stopRecording() : startRecording(); };
+          pauseBtn.onclick = togglePause;
+          sumBtn.onclick = generateNotes;
+          saveGDriveBtn.onclick = openGooglePicker;
+          clearAllBtn.onclick = () => clearAllContent(true); // Pass true for confirmation
+          toggleCustomInstructionsBtn.onclick = toggleCustomInstructions;
+          // togglePreviewBtn.onclick = toggleNotePreview;
+
+          // Save content periodically and on page unload
+          full.addEventListener("input", saveSession);
+          customInstructionsTextarea.addEventListener("input", saveSession);
+          window.addEventListener("beforeunload", () => {
+            clearTimeout(saveTimeout); // Clear any pending save
+            saveSession(); // Save immediately before unload
+            if (running) {
+              // Optional: Warn user if recording is active?
+              // return "Recording is in progress. Are you sure you want to leave?";
+            }
+          });
+
+          copyBtn.onclick = () => {
+            if (!window.notesMD) return;              // nothing to copy
+
+            const html = notes.innerHTML;
+
+            /* —— Clipboard API with both flavours —— */
+            navigator.clipboard.write([
+              new ClipboardItem({
+                "text/html": new Blob([html], { type: "text/html" }),
+                "text/plain": new Blob([window.notesMD], { type: "text/plain" })
+              })
+            ]).then(() => {
+              copyBtn.textContent = "✅ Copied";            // UX feedback
+              setTimeout(() => copyBtn.textContent = "📋 Copy", 1200);
+            }).catch(err => {
+              console.error("Clipboard write failed:", err);
+              alert("Couldn’t copy – see console");
+            });
+          };
+
+          // Initial load
+          loadSession();
+
+          ; (async () => {
+            // give the DOM a moment to settle
+            await new Promise(r => setTimeout(r, 50));
+            await bootstrapAuth();
+            if (currentUser) {
+              closeModal();
+            }
+          })();
+
+        }); 
+      </script>
+  </body>
 
 </html>
