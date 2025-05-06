@@ -193,9 +193,20 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
 # Add CORS Middleware (ensure it's added correctly relative to other middleware if needed)
+# app.add_middleware(
+#     CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
+# )
+
+PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "https://lab12note.com")
+
 app.add_middleware(
-    CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
+    CORSMiddleware,
+    allow_origins=[PUBLIC_BASE_URL],   # only your front‑end origin
+    allow_credentials=True,            #.enable sending/receiving cookies
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
 )
+
 
 @app.on_event("startup")
 async def startup():
