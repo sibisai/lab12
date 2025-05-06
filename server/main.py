@@ -339,15 +339,18 @@ async def quota_api(
 # ── WebSocket: streaming STT (Protected) ───────────────────────────────────
 @app.websocket("/ws/stt")
 async def websocket_stt(ws: WebSocket):
+    # accept everyone, but record username if cookie is valid
+    await ws.accept()
+    cookie_token = ws.cookies.get("access_token")
     try:
-        cookie_token = ws.cookies.get("access_token")
-        username = verify_token(cookie_token, WebSocketException(code=1008, reason="Invalid token"))
-        await ws.accept()
+        username = verify_token(
+            cookie_token,
+            WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid token")
+        )
         logger.info(f"WebSocket connection accepted for user: {username}")
-    except WebSocketException as e:
-        logger.warning(f"WebSocket connection rejected: {e.reason}")
-        await ws.close(code=e.code, reason=e.reason)
-        return
+    except Exception:
+        username = None
+        logger.info("WebSocket connection accepted for anonymous user")
 
     if not model:
         logger.error("Attempted WebSocket connection but Vosk model is not loaded.")
@@ -370,18 +373,18 @@ async def websocket_stt(ws: WebSocket):
               pr = json.loads(rec.PartialResult())
               logger.debug(f"partial: {pr['partial'][:50]}")
               await ws.send_json({ "partial": pr["partial"] })
-    except WebSocketException as e:
-        logger.info(f"WebSocket connection closed for user {username} with code {e.code}: {e.reason}")
+    except WebSocketException:
+        logger.info(f"Client disconnected cleanly (user={username})")
     except Exception as e:
         logger.error(f"Unexpected WebSocket error for user {username}: {e}", exc_info=True)
         await ws.close(code=status.WS_1011_INTERNAL_ERROR, reason="Internal server error")
     finally:
-        logger.info(f"Closing WebSocket resources for user {username}.")
-        # Ensure ws is closed if not already
+        logger.info(f"Cleaning up resources for user {username}")
         try:
             await ws.close(code=status.WS_1000_NORMAL_CLOSURE)
-        except RuntimeError: # Already closed
-            pass 
+        except RuntimeError:
+            # already closed, ignore
+            pass
 
 # ── /summarize (Protected & Rate Limited) ───────────────────────────────────
 from server.quota import enforce_quota

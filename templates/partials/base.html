@@ -183,11 +183,19 @@
           });
 
           async function bootstrapAuth() {
+            // only hit /me if the HTTP‑only cookie exists
+            if (!document.cookie.split(';').some(c => c.trim().startsWith('access_token='))) {
+              currentUser = null;
+              window.currentUserFullName = null;
+              updateAuthUI();
+              return;
+            }
+
             const res = await fetch("/me", { credentials: "include" });
             if (res.ok) {
               const { username, full_name } = await res.json();
               currentUser = username;
-              window.currentUserFullName = full_name;      // ← store full name
+              window.currentUserFullName = full_name;
               updateAuthUI();
             } else {
               currentUser = null;
@@ -566,9 +574,7 @@
           // --- Initial Setup ---
           window.addEventListener("DOMContentLoaded", async () => {
             await bootstrapAuth();
-            await fetchQuota();
             updateModalUI(authMode);
-
             if (!currentUser) {
               openModal();
             }
@@ -669,12 +675,6 @@
             updateAuthUI();
           }
           authButton.onclick = logout;
-
-          // Check token status on initial load
-          updateAuthUI();
-          if (!currentUser) {
-            openModal(); // Open login if not logged in
-          }
 
           // --- Feedback Modal --- 
           function openFeedbackModal() {
@@ -797,10 +797,6 @@
 
           // --- WebSocket Handling --- 
           function connectWebSocket() {
-            if (!currentUser) {
-              openModal();
-              return;
-            }
             const wsUrl = WS_BASE_URL;
             ws = new WebSocket(wsUrl);
             updateStatus("connecting", "Connecting...");
@@ -1351,14 +1347,14 @@
           // Initial load
           loadSession();
 
-          ; (async () => {
-            // give the DOM a moment to settle
-            await new Promise(r => setTimeout(r, 50));
-            await bootstrapAuth();
-            if (currentUser) {
-              closeModal();
-            }
-          })();
+          // ; (async () => {
+          //   // give the DOM a moment to settle
+          //   await new Promise(r => setTimeout(r, 50));
+          //   await bootstrapAuth();
+          //   if (currentUser) {
+          //     closeModal();
+          //   }
+          // })();
 
         }); 
       </script>
