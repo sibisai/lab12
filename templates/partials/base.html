@@ -804,6 +804,12 @@
             const wsUrl = WS_BASE_URL;
             ws = new WebSocket(wsUrl);
             updateStatus("connecting", "Connecting...");
+            const HEARTBEAT_MS = 15000;
+            let heartbeat = setInterval(() => {
+              if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: "ping" }));
+              }
+            }, HEARTBEAT_MS);
 
             ws.onopen = () => {
               console.log("WebSocket connected");
@@ -870,6 +876,7 @@
               startBtn.classList.remove("recording");
               pauseBtn.classList.add("hidden");
               stopAudioProcessing();
+              clearInterval(heartbeat);
               // Attempt to reconnect if closed unexpectedly?
             };
           }

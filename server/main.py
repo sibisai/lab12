@@ -373,7 +373,19 @@ async def websocket_stt(ws: WebSocket):
     rec.SetWords(True)
     try:
         while True:
-            chunk = await ws.receive_bytes()
+            msg = await ws.receive()
+            if msg["type"] == "websocket.disconnect":
+                break
+
+            if "text" in msg:
+                data = json.loads(msg["text"])
+                if data.get("type") == "ping":
+                    await ws.send_json({"type": "pong"})
+                    continue
+                # (you could negotiate control commands here)
+                continue
+
+            chunk = msg["bytes"]
             logger.debug(f"🔊 got {len(chunk)}-byte chunk from client")
             if rec.AcceptWaveform(chunk):
               res = json.loads(rec.Result())
