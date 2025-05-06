@@ -183,25 +183,28 @@
           });
 
           async function bootstrapAuth() {
-            // only hit /me if the HTTP‑only cookie exists
-            if (!document.cookie.split(';').some(c => c.trim().startsWith('access_token='))) {
+            let res;
+            try {
+              // always ask the server who I am
+              res = await fetch("/me", { credentials: "include" });
+            } catch (err) {
+              // network error (no cookies, offline, etc.)
               currentUser = null;
               window.currentUserFullName = null;
               updateAuthUI();
               return;
             }
 
-            const res = await fetch("/me", { credentials: "include" });
             if (res.ok) {
               const { username, full_name } = await res.json();
               currentUser = username;
               window.currentUserFullName = full_name;
-              updateAuthUI();
             } else {
               currentUser = null;
               window.currentUserFullName = null;
-              updateAuthUI();
             }
+
+            updateAuthUI();
           }
 
           function openModal() {
@@ -573,11 +576,12 @@
 
           // --- Initial Setup ---
           window.addEventListener("DOMContentLoaded", async () => {
+            // see if they’re already logged in
             await bootstrapAuth();
+            // don’t auto‑show the login modal for anonymous users
             updateModalUI(authMode);
-            if (!currentUser) {
-              openModal();
-            }
+            // if they’re not logged in, just leave the page usable
+            // openModal() is only called when they click “Login”
           });
 
           document.getElementById('footer-feedback')
@@ -661,7 +665,7 @@
               authButton.onclick = openModal;
             }
 
-            sumBtn.disabled = !(full.textContent.trim() && currentUser);
+            sumBtn.disabled = !full.textContent.trim();
             updateGDriveButtonState();
             updateClearAllButtonVisibility();
           }
@@ -953,7 +957,7 @@
           function updateFullTranscript(text) {
             full.textContent += text + " ";
             saveSession();
-            sumBtn.disabled = !(full.textContent.trim() && currentUser);
+            sumBtn.disabled = !full.textContent.trim();
             updateClearAllButtonVisibility(); // Update button visibility
           }
 
@@ -1132,7 +1136,7 @@
             }
             // console.log("loadSession - Notes MD Length:", window.notesMD?.length);
             // Update UI elements based on loaded content
-            sumBtn.disabled = !(full.textContent.trim() && currentUser);
+            sumBtn.disabled = !full.textContent.trim();
             updateGDriveButtonState();
             updateClearAllButtonVisibility(); // Ensure button visibility is correct on load
           }
