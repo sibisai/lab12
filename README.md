@@ -44,22 +44,10 @@ _For full technical details and security info see [SETUP.md](docs/SETUP.md)._
 
 ## Future Roadmap
 
-- Speaker diarization
+- Dark mode
 - Robust testing & CI/CD
 - Shareable links & “pro” subscription
 
 ---
-
-## Acknowledgements
-
-Thanks to all the libraries & services that power Lab12:
-
-- **Vosk** (offline speech‑to‑text engine, [Apache License 2.0](https://github.com/alphacep/vosk-api/tree/master?tab=Apache-2.0-1-ov-file#readme))
-- **OpenAI** (GPT‑4o)
-- **Google Drive & Picker APIs**
-- **FastAPI**, **Uvicorn**
-- **Marked.js**, **SlowAPI**
-- **SQLAlchemy**, **asyncpg**
-- **SendGrid**, **Passlib**
 
 <sup>Dual‑licensed under [AGPL v3](https://www.gnu.org/licenses/agpl-3.0.html) OR Commercial. See [LICENSE](LICENSE.md) for details.</sup>
