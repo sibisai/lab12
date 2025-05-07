@@ -814,7 +814,7 @@
             }, HEARTBEAT_MS);
 
             ws.onopen = () => {
-              console.log("WebSocket connected");
+              // console.log("WebSocket connected");
               running = true;
               paused = false;
               updateStatus("active", "Recording...");
@@ -870,12 +870,12 @@
             };
 
             ws.onclose = (event) => {
-              console.log("WebSocket closed:", event.code, event.reason);
               // only reconnect if it wasn’t a polite client‑initiated close
               if (event.code !== 1000 && event.code !== 1005) {
                 connectWebSocket();
                 return;
               }
+              console.log("WebSocket closed:", event.code, event.reason);
               clearInterval(heartbeat);
               running = false;
               paused = false;
@@ -1125,7 +1125,7 @@
                 customInstructions: customInstructionsTextarea.value
               };
               localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(sessionData));
-              console.log("Session saved");
+              // console.log("Session saved");
             }, 500); // Debounce saving
           }
 
