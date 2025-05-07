@@ -802,6 +802,8 @@
           // --- WebSocket Handling --- 
           function connectWebSocket() {
             const wsUrl = WS_BASE_URL;
+            // let retryDelay = 1000;    // initial 1 s
+            // const maxDelay = 30000; // cap at 30 s
             ws = new WebSocket(wsUrl);
             updateStatus("connecting", "Connecting...");
             const HEARTBEAT_MS = 15000;
@@ -869,6 +871,12 @@
 
             ws.onclose = (event) => {
               console.log("WebSocket closed:", event.code, event.reason);
+              // only reconnect if it wasn’t a polite client‑initiated close
+              if (event.code !== 1000 && event.code !== 1005) {
+                connectWebSocket();
+                return;
+              }
+              clearInterval(heartbeat);
               running = false;
               paused = false;
               updateStatus("ready", event.reason || "Disconnected");
@@ -876,8 +884,6 @@
               startBtn.classList.remove("recording");
               pauseBtn.classList.add("hidden");
               stopAudioProcessing();
-              clearInterval(heartbeat);
-              // Attempt to reconnect if closed unexpectedly?
             };
           }
 
